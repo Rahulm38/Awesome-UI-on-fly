@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Awesome UI on Fly</title>
+  <meta name="description" content="A card assistant that decides and builds its UI on the fly — with every model call, score and latency visible.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230e7490%22/%3E%3Cpath fill=%22%23ecfeff%22 d=%22M13 6c.7 5.8 3.4 8.5 9.2 9.2-5.8.7-8.5 3.4-9.2 9.2-.7-5.8-3.4-8.5-9.2-9.2 5.8-.7 8.5-3.4 9.2-9.2z%22/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#08080a">
+  <meta property="og:title" content="Awesome UI on Fly">
+  <meta property="og:description" content="Decisions and interfaces made on the fly — every model call, score and timing shown live.">
+  <meta property="og:type" content="website">
+  <!-- Share preview. Once the site is live, change og-image.png below to its FULL address,
+       e.g. https://<you>.github.io/<repo>/og-image.png — LinkedIn and Facebook need an absolute URL. -->
+  <meta property="og:image" content="og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Awesome UI on Fly — a phone drawing a spending chart on the fly, beside a live HUD of the Jev, LLM and insights calls.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Awesome UI on Fly">
+  <meta name="twitter:description" content="Decisions and interfaces made on the fly — every model call, score and timing shown live.">
+  <meta name="twitter:image" content="og-image.png">
+  <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="site.css?v=39">
+  <link rel="stylesheet" href="phone.css?v=39">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#"><span class="mark"><svg viewBox="0 0 24 24"><use href="#i-sparkle"/></svg></span><b>Awesome UI on Fly</b><span class="tagline">starring Nova</span></a>
+    <label class="tg" title="Simulation only — no real model is called. Jev and the LLM time out; the rules fallback answers."><input type="checkbox" id="outage" aria-label="Simulate a model outage"><span></span><b class="full">Simulate outage</b><b class="short">Outage</b></label>
+    <a class="btn sm" href="architecture.html"><span class="full">Architecture</span><span class="short">Docs</span></a>
+  </header>
+
+  <section class="hero">
+    <span class="eyebrow"><i></i>Awesome UI on Fly · runs entirely in your browser</span>
+      <h1>Decisions and interfaces, <em>made on the fly.</em></h1>
+      <ul class="points">
+        <li><b>Jev</b> decides</li><li><b>LLM</b> fills in</li><li><b>Gate</b> guards</li><li><b>UI</b> drawn per question</li><li><b>Every call</b> shown live</li>
+      </ul>
+      <div class="hero-cta">
+        <button class="btn primary" id="tour"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>Play the tour</button>
+        <a class="btn" href="#try">Try it yourself</a>
+      </div>
+    <div class="stats">
+      <span class="stat"><b>3 calls</b>in parallel per turn</span>
+      <span class="stat"><b>14 charts</b>picked from the data</span>
+      <span class="stat"><b>0.60 / 0.70</b>bars to act · to act irreversibly</span>
+      <span class="stat"><b>1 road</b>to the bank, read back before ✓</span>
+    </div>
+  </section>
+
+  <main class="stage">
+    <section class="phone-col">
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar" id="statusbar"><span id="clock">9:41</span>
+            <span class="sb-icons">
+              <svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5.5" width="3" height="6.5" rx="1" fill="currentColor"/><rect x="10" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+              <svg viewBox="0 0 16 12"><path d="M8 11.5 5.6 9a3.4 3.4 0 0 1 4.8 0zM3.4 6.8a6.5 6.5 0 0 1 9.2 0l-1.5 1.5a4.4 4.4 0 0 0-6.2 0zM1 4.4a9.9 9.9 0 0 1 14 0l-1.5 1.5a7.8 7.8 0 0 0-11 0z" fill="currentColor"/></svg>
+              <svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="8" rx="2" fill="currentColor"/><path d="M25 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".4"/></svg>
+            </span>
+          </div>
+
+          <div class="host" id="host"></div>
+          <button class="fab" id="fab" aria-label="Open Nova"><svg viewBox="0 0 24 24"><use href="#i-sparkle"/></svg><span class="dot"></span></button>
+          <div class="scrim off" id="scrim"></div>
+
+          <section class="sheet off" id="sheet" aria-label="Nova assistant">
+            <button class="handle" id="handle" aria-label="Close"></button>
+            <header class="sheet-head" id="sheet-head">
+              <span class="sparkle"><svg viewBox="0 0 24 24"><use href="#i-sparkle"/></svg></span>
+              <button class="card-chip" id="card-chip" aria-haspopup="dialog"></button>
+              <button class="icon-btn" id="activity" aria-label="What Nova changed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg><span class="badge" id="badge"></span></button>
+            </header>
+            <div class="chat" id="chat"></div>
+            <div class="tray" id="tray" hidden></div>
+            <form class="inputbar" id="composer" autocomplete="off">
+              <input id="input" placeholder="Ask Nova…" aria-label="Message Nova">
+              <button class="trail" id="trail" aria-label="Send">
+                <svg class="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+                <svg class="i-send" viewBox="0 0 24 24"><path d="M3.4 20.4 21 12 3.4 3.6l-.01 6.53L15 12 3.39 13.87z" fill="currentColor"/></svg>
+              </button>
+            </form>
+          </section>
+
+          <div class="picker" id="picker" hidden></div>
+        </div>
+      </div>
+      <div class="under">
+        <div class="seg" id="mode-seg" role="radiogroup" aria-label="When to call Jev"><span class="seg-l">Call Jev</span><button data-mode="send" class="on" role="radio" aria-checked="true">On send</button><button data-mode="live" role="radio" aria-checked="false">Every keystroke</button></div>
+        <p class="caption">Card chip = context · <span class="kbd">/</span> type · <span class="kbd">Esc</span> scenarios</p>
+      </div>
+    </section>
+
+    <section class="inspector">
+      <div class="panel" id="try">
+        <div class="ph"><h2>Scenarios</h2><small>click a question · it’s typed into the phone for you</small></div>
+        <div class="scen-tabs" id="scen-tabs" role="tablist" aria-label="Scenario groups"></div>
+        <div class="scen" id="scenarios" role="tabpanel"></div>
+        <div class="narrate" id="narrate"><span class="np"><i class="np-dot"></i><span><b>Pick one</b> · or type in the phone</span></span></div>
+      </div>
+
+      <div class="panel" id="flow-panel">
+        <div class="ph"><h2>System flow</h2><small id="trace-label">waiting for a message</small><div class="r"><span class="sim-l" title="Simulation only — no real model is called">Simulate</span><label class="tg" title="Simulation only · turn Jev off and the LLM decides instead; the typing tray goes quiet"><input type="checkbox" data-model="jev" checked aria-label="Simulate Jev up or down"><span></span>Jev</label><label class="tg" title="Simulation only · turn the LLM off and rules extract the values"><input type="checkbox" data-model="llm" checked aria-label="Simulate LLM up or down"><span></span>LLM</label><span class="live" id="live"><i></i>idle</span></div></div>
+        <div class="flow-wrap"><svg id="flow" role="img" aria-label="Request pipeline: client, orchestrator, then Jev, LLM and Insights in parallel (rules as fallback), safety gate, core banking, UI composer, back to the client. It animates each live request; the line below describes the current stage."></svg></div>
+        <div class="flow-say" id="flow-say"><i></i><span>idle · the pipeline replays softly until something happens</span></div>
+        <div class="summary" id="summary"><span>Waiting for the first request</span></div>
+      </div>
+
+      <div class="panel" id="inspect-panel">
+        <div class="tabbar" role="tablist" aria-label="Request details">
+          <button role="tab" id="t-scores" aria-controls="p-scores" data-tab="scores" class="on">Decision</button>
+          <button role="tab" id="t-latency" aria-controls="p-latency" data-tab="latency">Latency</button>
+          <button role="tab" id="t-payload" aria-controls="p-payload" data-tab="payload">Payloads</button>
+          <button role="tab" id="t-log" aria-controls="p-log" data-tab="log">Log <i id="log-count"></i></button>
+        </div>
+        <div class="tab on" id="p-scores" role="tabpanel" aria-labelledby="t-scores" data-pane="scores">
+          <div class="sub"><small id="scores-text"></small><div id="score-tabs" class="mini-tabs" role="tablist" aria-label="Message parts"></div></div>
+          <div id="scores"><p class="hud-empty">awaiting first request<i>_</i></p></div>
+        </div>
+        <div class="tab" id="p-latency" role="tabpanel" aria-labelledby="t-latency" data-pane="latency"><div id="waterfall"><p class="empty hud-empty">awaiting first request<i>_</i></p></div></div>
+        <div class="tab" id="p-payload" role="tabpanel" aria-labelledby="t-payload" data-pane="payload">
+          <div class="sub"><small id="json-title">Click a row in Latency to inspect it</small>
+            <div class="mini-tabs" id="side-tabs" role="tablist" aria-label="Payload side"><button role="tab" data-side="req">Request</button><button role="tab" data-side="res" class="on">Response</button></div></div>
+          <pre id="json" class="json"><span class="hud-empty">select a span in Latency<i>_</i></span></pre>
+        </div>
+        <div class="tab" id="p-log" role="tabpanel" aria-labelledby="t-log" data-pane="log"><ol id="log" class="log"></ol></div>
+      </div>
+    </section>
+  </main>
+
+  <section class="how">
+    <h2>How a message becomes UI</h2>
+    <div class="steps">
+      <div class="step"><b>Decide</b><ul><li>Jev scores a closed catalogue</li><li>Can’t invent actions</li><li>Near tie → ask</li></ul></div>
+      <div class="step"><b>Fill in</b><ul><li>LLM extracts values</li><li>Insights read a warm snapshot</li><li>All in parallel</li></ul></div>
+      <div class="step"><b>Guard</b><ul><li>Resolve card · check eligibility</li><li>Lane: act · confirm · ask · read</li><li>Read-back before ✓</li></ul></div>
+      <div class="step"><b>Draw</b><ul><li>Chart picked from data shape</li><li>Status rows · chips · CTA</li><li>Phone only renders</li></ul></div>
+    </div>
+  </section>
+
+  <footer class="foot"><span>Awesome UI on Fly · assistant “Nova” · fictional data · no network calls</span><span><button class="linkish" id="guide-again" type="button">Show the guide</button> · <a href="architecture.html">Architecture</a> · <a href="architecture.html#rules">Design rules</a></span></footer>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path fill="currentColor" d="M10 2.5c.5 4.4 2.6 6.5 7 7-4.4.5-6.5 2.6-7 7-.5-4.4-2.6-6.5-7-7 4.4-.5 6.5-2.6 7-7zM18.5 13c.25 2 1.2 3 3.2 3.2-2 .25-3 1.2-3.2 3.2-.25-2-1.2-3-3.2-3.2 2-.25 3-1.2 3.2-3.2zM5 16.5c.2 1.5.9 2.2 2.4 2.4-1.5.2-2.2.9-2.4 2.4-.2-1.5-.9-2.2-2.4-2.4 1.5-.2 2.2-.9 2.4-2.4z"/></symbol>
+  </defs></svg>
+
+  <script src="js/a11y.js?v=39"></script>
+  <script src="js/flowgraph.js?v=39"></script>
+  <script src="js/data.js?v=39"></script>
+  <script src="js/jev.js?v=39"></script>
+  <script src="js/llm.js?v=39"></script>
+  <script src="js/insights.js?v=39"></script>
+  <script src="js/engine.js?v=39"></script>
+  <script src="js/charts.js?v=39"></script>
+  <script src="js/phone.js?v=39"></script>
+  <script src="js/inspector.js?v=39"></script>
+  <script src="js/main.js?v=39"></script>
+  <script src="js/guide.js?v=39"></script>
+</body>
+</html>

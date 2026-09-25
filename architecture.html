@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta property="og:title" content="Awesome UI on Fly · Architecture">
+  <meta property="og:image" content="og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Awesome UI on Fly · Architecture</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230e7490%22/%3E%3Cpath fill=%22%23ecfeff%22 d=%22M13 6c.7 5.8 3.4 8.5 9.2 9.2-5.8.7-8.5 3.4-9.2 9.2-.7-5.8-3.4-8.5-9.2-9.2 5.8-.7 8.5-3.4 9.2-9.2z%22/%3E%3C/svg%3E">
+  <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="site.css?v=36">
+  <style>
+    .doc-wrap { max-width: 1040px; margin: 0 auto; padding: 8px 28px 48px; }
+    .doc-wrap h1 { font: 600 clamp(24px, 2.6vw, 32px)/1.15 var(--display); letter-spacing: -.025em; margin: 28px 0 0; }
+    .doc-wrap h2 { font: 600 13px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: #22d3eecc; margin: 36px 0 10px; }
+    .doc-wrap h2 small { font: 12px var(--sans); letter-spacing: 0; text-transform: none; color: var(--text-3); margin-left: 10px; }
+    .fig { position: relative; margin: 0; border: 1px solid #22d3ee1f; border-radius: 4px; overflow: hidden; padding: 18px;
+      background: radial-gradient(120% 90% at 50% 40%, #04161a 0%, #020506 70%); box-shadow: inset 0 0 60px #000; }
+    .fig::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .45; background: repeating-linear-gradient(0deg, #ffffff07 0 1px, transparent 1px 3px); }
+    .fig svg { display: block; width: 100%; height: auto; position: relative; }
+    .fig figcaption { font: 11px var(--mono); letter-spacing: .06em; color: var(--hud-dim); margin-top: 10px; position: relative; }
+    table { width: 100%; border-collapse: collapse; margin: 0; font-size: 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { font: 600 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); background: #ffffff04; }
+    td { color: var(--text-2); } td b { color: var(--text); font-family: var(--mono); font-size: 12px; letter-spacing: .04em; }
+    code { font: 12px var(--mono); color: #67e8f9; }
+    .rules { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+    .rule { background: var(--surface); border: 1px solid var(--border); border-left: 2px solid #22d3ee88; border-radius: 4px; padding: 10px 12px; }
+    .rule b { display: block; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+    .rule span { color: var(--text-3); font-size: 12.5px; }
+    svg text { font-family: var(--mono); }
+    .b rect { fill: #03090bcc; stroke-width: 1.2; } .b .t { fill: #e6f6f8; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-anchor: middle; text-transform: uppercase; }
+    .b .s { fill: #7b8f94; font-size: 10px; text-anchor: middle; }
+    .ar { stroke: #22d3ee55; stroke-width: 1.2; fill: none; marker-end: url(#h); } .ar.dash { stroke-dasharray: 3 4; }
+    .lbl { fill: var(--hud-dim); font-size: 10px; } .life { stroke: #22d3ee22; stroke-dasharray: 2 4; }
+    .sq { stroke: #22d3ee88; stroke-width: 1.2; marker-end: url(#h); } .sq.ret { stroke-dasharray: 3 4; stroke: #22d3ee44; }
+    .grp { fill: #22d3ee06; stroke: #22d3ee33; stroke-dasharray: 2 4; }
+    .points { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; }
+    .points li { font-size: 13px; color: var(--text-2); background: #ffffff06; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; } .points b { color: var(--text); }
+    .fig-live { padding: 0; border: 0; background: none; box-shadow: none; overflow: visible; }
+    .fig-live::after { display: none; }
+    .fig-live .flow-wrap, .fig-live .flow-say { margin-left: 0; margin-right: 0; }
+    .guards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+  </style>
+</head>
+<body>
+  <header class="top"><div class="brand"><span class="mark" style="font-size:13px">✦</span><b>Awesome UI on Fly</b><span class="tagline">Architecture</span></div><a class="btn-ghost" href="index.html">← Live demo</a></header>
+
+  <main class="doc-wrap"><h1>Awesome UI on Fly · how it works</h1>
+    <ul class="points"><li><b>Jev</b> decides</li><li><b>LLM</b> fills in</li><li><b>Gate</b> guards · only door to the bank</li><li><b>Phone</b> only renders blocks</li></ul>
+
+    <svg width="0" height="0" style="position:absolute"><defs><marker id="h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#22d3ee99"/></marker></defs></svg>
+
+    <h2>System view <small>the same live graph as the demo</small></h2>
+    <figure class="fig fig-live">
+      <div class="flow-wrap"><svg id="flow" role="img" aria-label="Request pipeline: client, orchestrator, then Jev, LLM and Insights in parallel (rules as fallback), safety gate, core banking, UI composer, back to the client."></svg></div>
+      <div class="flow-say"><i></i><span>a sample turn plays through the pipeline</span></div>
+      <figcaption>Jev ∥ LLM ∥ Insights · both models down → rules · the demo draws every real request on this graph</figcaption>
+    </figure>
+
+    <table>
+      <tr><th>Part</th><th>Job</th><th>Why separate</th></tr>
+      <tr><td><b>Jev</b></td><td>Picks the action · closed set · scores</td><td>Can’t invent · thresholds · per-keystroke fast</td></tr>
+      <tr><td><b>LLM</b></td><td>Extracts values: amount, merchant, dates</td><td>Good at language · never picks the action</td></tr>
+      <tr><td><b>Insights</b></td><td>Question → chart from data shape</td><td>Pure · &lt; 15 ms · warm snapshot</td></tr>
+      <tr><td><b>Rules</b></td><td>Answers when models are down</td><td>Blunt but always there</td></tr>
+      <tr><td><b>Safety gate</b></td><td>Card · eligibility · values · lane</td><td>Only door to a write</td></tr>
+      <tr><td><b>Bank</b></td><td>Write → read-back</td><td>✓ only after read-back</td></tr>
+      <tr><td><b>Composer</b></td><td>Results → UI blocks</td><td>Phone only renders</td></tr>
+    </table>
+
+    <h2>A turn — press send</h2>
+    <figure class="fig">
+      <svg viewBox="0 0 900 430">
+        <g class="lbl" text-anchor="middle" style="font-size:12.5px;fill:#e5edf7;font-weight:600">
+          <text x="60" y="22">Phone</text><text x="190" y="22">Orchestrator</text><text x="330" y="22">Jev</text><text x="450" y="22">LLM</text><text x="590" y="22">Safety gate</text><text x="720" y="22">Bank</text><text x="840" y="22">Composer</text>
+        </g>
+        <g class="life"><path d="M60 32V420M190 32V420M330 32V420M450 32V420M590 32V420M720 32V420M840 32V420"/></g>
+        <path class="sq" d="M60 55H188"/><text class="lbl" x="70" y="49">text + screen context</text>
+        <rect class="grp" x="180" y="68" width="290" height="92" rx="8"/><text class="lbl" x="392" y="84">in parallel</text>
+        <path class="sq" d="M190 95H328"/><text class="lbl" x="200" y="90">which action?</text>
+        <path class="sq ret" d="M330 112H192"/><text class="lbl" x="232" y="108">scores · 30–80 ms</text>
+        <path class="sq" d="M190 132H448"/><text class="lbl" x="360" y="127">which values?</text>
+        <path class="sq ret" d="M450 150H192"/><text class="lbl" x="330" y="146">slots · 400–900 ms</text>
+        <path class="sq" d="M190 185H588"/><text class="lbl" x="400" y="180">proposals</text>
+        <text class="lbl" x="598" y="208">catalogue · card · eligibility · values · lane</text>
+        <rect class="grp" x="580" y="222" width="160" height="92" rx="8"/><text class="lbl" x="588" y="236">lane = act</text>
+        <path class="sq" d="M590 255H718"/><text class="lbl" x="632" y="250">write</text>
+        <path class="sq" d="M590 280H718"/><text class="lbl" x="620" y="275">read-back</text>
+        <path class="sq ret" d="M720 300H592"/><text class="lbl" x="630" y="296">verified</text>
+        <path class="sq ret" d="M590 340H192"/><text class="lbl" x="330" y="335">results (done · confirm · ask · read)</text>
+        <path class="sq" d="M190 365H838"/><text class="lbl" x="480" y="360">compose</text>
+        <path class="sq ret" d="M840 395H62"/><text class="lbl" x="400" y="390">UI blocks</text>
+      </svg>
+      <figcaption>Every hop → latency panel + payloads</figcaption>
+    </figure>
+
+    <h2>A keystroke — score as you type</h2>
+    <figure class="fig">
+      <svg viewBox="0 0 900 190">
+        <g class="b"><rect x="20" y="60" width="150" height="56" rx="10" stroke="#94a3b8"/><text class="t" x="95" y="84">Keystroke #n</text><text class="s" x="95" y="102">debounce 120 ms</text></g>
+        <g class="b"><rect x="230" y="60" width="150" height="56" rx="10" stroke="#a78bfa"/><text class="t" x="305" y="84">Jev only</text><text class="s" x="305" y="102">no LLM · no writes</text></g>
+        <g class="b"><rect x="440" y="60" width="170" height="56" rx="10" stroke="#38bdf8"/><text class="t" x="525" y="84">Is #n the newest?</text><text class="s" x="525" y="102">older answers are dropped</text></g>
+        <g class="b"><rect x="680" y="14" width="200" height="56" rx="10" stroke="#34d399"/><text class="t" x="780" y="38">Draw the action tray</text><text class="s" x="780" y="56">action · did you mean · handoff</text></g>
+        <g class="b"><rect x="680" y="112" width="200" height="56" rx="10" stroke="#f87171"/><text class="t" x="780" y="136">Drop it</text><text class="s" x="780" y="154">never paint over a newer answer</text></g>
+        <path class="ar" d="M170 88H228"/><path class="ar" d="M380 88H438"/><path class="ar" d="M610 78L678 48"/><path class="ar" d="M610 98L678 134"/>
+        <text class="lbl" x="628" y="54">yes</text><text class="lbl" x="628" y="136">no</text>
+      </svg>
+      <figcaption>Jev down → no tray · tray tap = ordinary turn · one road to the bank</figcaption>
+    </figure>
+
+    <h2>From verdict to UI</h2>
+    <table>
+      <tr><th>Jev verdict</th><th>What the phone gets</th></tr>
+      <tr><td><b>ACTION · read</b></td><td>Chart from data shape + answer + chips</td></tr>
+      <tr><td><b>ACTION · act</b></td><td>Write → read-back → ✓ + Undo</td></tr>
+      <tr><td><b>ACTION · confirm</b></td><td>Confirm · irreversible or all cards</td></tr>
+      <tr><td><b>ACTION · ask</b></td><td>Chips for value · or card picker</td></tr>
+      <tr><td><b>CANDIDATES</b></td><td>Did you mean · 2–3 readings</td></tr>
+      <tr><td><b>HANDOFF</b></td><td>Can’t here + screen that can</td></tr>
+      <tr><td><b>AMBIGUOUS</b></td><td>No tray · on send asks</td></tr>
+      <tr><td><b>UNSUPPORTED</b></td><td>Says so</td></tr>
+    </table>
+
+    <h2>Card resolution</h2><ul class="points"><li>picked</li><li>→ named</li><li>→ transaction</li><li>→ on screen</li><li>→ earlier in message</li><li>→ only card</li><li>→ ask</li></ul>
+
+    <h2>Thresholds</h2>
+    <table>
+      <tr><th>Name</th><th>Value</th><th>Meaning</th></tr>
+      <tr><td><code>act</code></td><td>0.60</td><td>act</td></tr>
+      <tr><td><code>highStakes</code></td><td>0.70</td><td>irreversible</td></tr>
+      <tr><td><code>handoff</code></td><td>0.50</td><td>name a screen</td></tr>
+      <tr><td><code>candidateFloor</code></td><td>0.35</td><td>plausible reading</td></tr>
+      <tr><td><code>margin</code></td><td>0.15</td><td>lead over runner-up</td></tr>
+    </table>
+
+    <h2>Safeguards <small>this page · a real deployment</small></h2>
+    <div class="guards">
+      <div class="rule"><b>No network calls</b><span>CSP <code>connect-src 'none'</code> · nothing can leave the page</span></div>
+      <div class="rule"><b>No real Jev here</b><span>Simulated in the browser · no key, no endpoint to hit</span></div>
+      <div class="rule"><b>Scenarios = recorded</b><span>Replay fixtures · never count against limits</span></div>
+      <div class="rule"><b>Typing = live</b><span>The only path a real model would ever serve</span></div>
+      <div class="rule"><b>Rate limited</b><span>Live only · 20 turns · 90 keystrokes / min → 429</span></div>
+      <div class="rule"><b>Real deployment</b><span>Gateway auth · per-user + per-IP quotas · key stays server-side</span></div>
+    </div>
+
+    <h2 id="rules">Design rules <small>never broken · each one visible in the demo</small></h2>
+    <div class="rules">
+      <div class="rule"><b>Never substitute</b><span>Unsupported stays unsupported</span></div>
+      <div class="rule"><b>Never drop</b><span>One row per part, in order</span></div>
+      <div class="rule"><b>Never narrow by probability</b><span>Scores rank, never hide</span></div>
+      <div class="rule"><b>A near tie is a question</b><span>No clear winner → 2–3 choices</span></div>
+      <div class="rule"><b>High stakes, higher bar</b><span>0.70 for irreversible</span></div>
+      <div class="rule"><b>Ambiguous words get no tray</b><span>“atm” alone → nothing</span></div>
+      <div class="rule"><b>Half a word asserts nothing</b><span>Partial word can’t clear the bar</span></div>
+      <div class="rule"><b>Newest keystroke wins</b><span>Stale answers dropped</span></div>
+      <div class="rule"><b>One road to the bank</b><span>Every tap = ordinary turn</span></div>
+      <div class="rule"><b>✓ means confirmed</b><span>Read-back before ✓</span></div>
+      <div class="rule"><b>Undo is a real write</b><span>30 min · gated · read back</span></div>
+      <div class="rule"><b>Order writes safely</b><span>Allow first, then restrict</span></div>
+      <div class="rule"><b>Dates aren't a model's job</b><span>Pure parser · unsure → nothing</span></div>
+      <div class="rule"><b>Values are checked</b><span>In range or known set only</span></div>
+      <div class="rule"><b>The demo never dies</b><span>Rules answer if models fail</span></div>
+      <div class="rule"><b>Charts don't shout zeros</b><span>No $0 labels · partial = hatched</span></div>
+    </div>
+  </main>
+  <footer class="foot">Simulated end to end in your browser · fictional data · illustrative latencies</footer>
+  <script src="js/flowgraph.js?v=36"></script>
+  <script src="js/arch-init.js"></script>
+</body>
+</html>
