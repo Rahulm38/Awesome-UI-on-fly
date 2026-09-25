@@ -1,0 +1,26 @@
+name: Feature idea
+description: Suggest an improvement to the showcase.
+title: "[Idea]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What should improve?
+      description: Describe the problem or opportunity.
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: What would you like to see?
+      description: Describe a possible solution or example.
+    validations:
+      required: false
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Project scope
+      options:
+        - label: I understand this showcase uses fictional data and simulated models.
+          required: false

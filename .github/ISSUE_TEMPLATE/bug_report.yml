@@ -1,0 +1,36 @@
+name: Bug report
+description: Report something that is not working as expected.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: This is a browser-only showcase with fictional data and simulated models. Please do not include real card, account, or transaction details.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe what you saw and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How can we reproduce it?
+      description: List the steps or scenario you used.
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: For example, Safari 18 on macOS
+    validations:
+      required: false
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshot or console output
+      description: Remove private information before sharing.
+    validations:
+      required: false

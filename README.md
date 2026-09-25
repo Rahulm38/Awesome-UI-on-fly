@@ -1,10 +1,15 @@
 # Awesome UI on Fly
 
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Deploy to GitHub Pages](https://github.com/Rahulm38/Awesome-UI-on-fly/actions/workflows/pages.yml/badge.svg)](https://github.com/Rahulm38/Awesome-UI-on-fly/actions/workflows/pages.yml)
+
+**[Open the live demo](https://rahulm38.github.io/Awesome-UI-on-fly/)** · [Architecture](architecture.html) · [Contributing](CONTRIBUTING.md)
+
 *Live decisions and interfaces built on the fly — starring Nova, a card assistant.*
 
 Nova is a card assistant that works out what you mean **while you type**, decides what to do, and **builds its interface for that answer on the fly**: a chart for a spending question, a card picker when it doesn't know which card you mean, a confirm step for anything that can't be undone.
 
-This repository is an interactive showcase of that design. The left side is the phone. The right side shows what the system does to produce each screen: which models are called, what they return, how confident they are, how long each hop takes, and why the next step was chosen.
+This repository is an interactive showcase of that design. The left side is the phone. The right side visualizes a simulated decision flow: sample model outputs, confidence, illustrative latency, and why the next step was chosen. It runs in your browser with fictional data; it does not call real models or banking services.
 
 ## Run it
 
@@ -95,8 +100,12 @@ docs/
 
 ## What is real and what is simulated
 
-Everything runs in your browser. Merchants are fictional. The models are **simulated**: Jev is a weighted-feature scorer that behaves like a calibrated classifier, and the “LLM” is a set of extractors. Latencies are illustrative ranges. Cards and transactions are made up and reset on reload. The **decision flow, thresholds, lanes, and safety rules** are the real design being demonstrated.
+Everything runs in your browser. Merchants are fictional. The models are **simulated**: Jev is a weighted-feature scorer that behaves like a calibrated classifier, and the “LLM” is a set of extractors. Latencies are illustrative ranges. Cards and transactions are made up and reset on reload. The **decision flow, thresholds, lanes, and safety rules** are the design being demonstrated.
+
+## Contributing
+
+Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the local setup and review checklist. GitHub's issue forms are available for [bug reports](https://github.com/Rahulm38/Awesome-UI-on-fly/issues/new?template=bug_report.yml) and [feature ideas](https://github.com/Rahulm38/Awesome-UI-on-fly/issues/new?template=feature_request.yml).
 
 ## License
 
-MIT. Fonts: Geist and Geist Mono © The Geist Project Authors, SIL Open Font License 1.1 (`fonts/OFL.txt`).
+The project code is released under the [MIT License](LICENSE). The bundled Geist and Geist Mono font files are separately licensed under the SIL Open Font License 1.1; see [`fonts/OFL.txt`](fonts/OFL.txt).
