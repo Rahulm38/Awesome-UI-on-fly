@@ -3,7 +3,7 @@
   const $ = s => document.querySelector(s);
   const { settings, message, intent, log, bus } = window.Engine;
   const input = $('#input'), form = $('#composer');
-  let live = true, replaying = false, seq = 0, inflight = 0, deb = null, busy = false, lastKey = 0, shown = null;
+  let live = true, replaying = false, seq = 0, inflight = 0, deb = null, busy = false, lastKey = 0, shown = null, typedBefore = '';
 
   // ── as-you-type ──────────────────────────────────────────────────────────
   // • nothing under 3 characters   • at most 2 requests in flight
@@ -11,7 +11,7 @@
   // • a different chart swaps in only at a word boundary or after 600 ms of quiet
   async function ask(text) {
     if (text.trim().length < 3) { Phone.tray(null); return; }
-    if (inflight >= 2) { log('2 keystroke requests already in flight — this one waits for the next pause', 'dim'); clearTimeout(deb); deb = setTimeout(() => ask(input.value), 150); return; }
+    if (inflight >= 3) { log('3 keystroke requests already in flight — the newest text goes when one comes back', 'dim'); clearTimeout(deb); deb = setTimeout(() => ask(input.value), 150); return; }
     const my = ++seq; inflight++;
     let r;
     try { r = await intent(Correct.fix(text).text, Phone.ctx, replaying); } finally { inflight--; }
@@ -28,8 +28,8 @@
     Phone.tray(p);
   }
 
-  // In "On send" mode Jev isn't called per keystroke, but the chart preview still is:
-  // it's a local read over the warm snapshot, not a model call.
+  // In "On send" mode the action waits for send; the chart preview still asks Jev which
+  // chart the words want, and code draws it from the warm snapshot.
   async function previewOnly(text) {
     const my = ++seq;
     if (text.trim().length < 3) { Phone.tray(null); return; }
@@ -59,9 +59,12 @@
       return;
     }
     clearTimeout(deb);
-    const text = input.value;
+    const text = input.value, before = typedBefore; typedBefore = text;
     if (!text.trim()) { seq++; shown = null; Phone.tray(null); return; }
-    deb = setTimeout(() => ask(text), 120);
+    // As on the phone app: ask at once at the 3rd character, at the end of a word or after a
+    // backspace; inside a word, wait for 180 ms of quiet.
+    const now = (before.trim().length < 3 && text.trim().length >= 3) || / $/.test(text) || !text.startsWith(before);
+    deb = setTimeout(() => ask(text), now ? 0 : 180);
   });
 
   // ── a full turn ──────────────────────────────────────────────────────────
@@ -129,7 +132,7 @@
     document.querySelectorAll('[data-mode]').forEach(x => { x.classList.toggle('on', x.dataset.mode === m); x.setAttribute('aria-checked', x.dataset.mode === m); });
     const note = document.getElementById('mode-note');
     if (note) note.textContent = live ? 'Jev scores every keystroke · actions appear before you send' : 'Jev decides when you press send';
-    log(live ? 'mode: Jev + an insight preview on every keystroke (min 3 chars, 120 ms debounce, ≤ 2 in flight)' : 'mode: nothing is sent until you press send');
+    log(live ? 'mode: Jev on every keystroke (from 3 chars · at once on a word end · 180 ms quiet inside a word · ≤ 3 in flight)' : 'mode: nothing is sent until you press send');
   }
   document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
     setMode(b.dataset.mode);
@@ -143,41 +146,41 @@
   const GROUPS = [
     ['Charts', 'a chart per question', [
       ['How much?', [
-        Q('How much on food last month?', 'number', 'how much did I spend on food last month', 'One number · change chip · 6-month sparkline', { tag: 'V1' }),
-        Q('Is my food spending a lot?', 'gauge', 'is my food spending a lot this month', 'Usual range band · projection marker · verdict', { tag: 'V18' }),
-        Q('How much of my limit is left?', 'meter', 'how much of my limit is left', 'Meter + even-pace tick · no limit → falls back', { tag: 'V9' }),
-        Q('What can I spend today?', 'daily meter', 'how much can I spend today', 'What’s left of a daily limit · none set → one number', { tag: 'V17' }),
+        Q('How much on food last month?', 'number', 'how much did I spend on food last month', 'One number · change chip · 6-month sparkline'),
+        Q('Is my food spending a lot?', 'gauge', 'is my food spending a lot this month', 'Usual range band · projection marker · verdict'),
+        Q('How much of my limit is left?', 'meter', 'how much of my limit is left', 'Meter + even-pace tick · no limit → falls back'),
+        Q('What can I spend today?', 'daily meter', 'how much can I spend today', 'What’s left of a daily limit · none set → one number'),
       ]],
       ['Where it goes', [
-        Q('Where did my money go?', 'donut', 'where did my money go last month', 'Donut if one slice clearly leads · else ranked bars', { tag: 'V8' }),
-        Q('Top merchants?', 'ranking', 'top merchants this month', 'Top 5 + Other · with logos', { tag: 'V7' }),
-        Q('Break down by category?', 'drill down', 'break down my spending by category', 'Category rows · tap one to see its merchants', { tag: 'V20' }),
-        Q('Spending by card?', 'split bar', 'spending by card', 'One bar split by card', { tag: 'V5' }),
+        Q('Where did my money go?', 'donut', 'where did my money go last month', 'Donut if one slice clearly leads · else ranked bars'),
+        Q('Top merchants?', 'ranking', 'top merchants this month', 'Top 5 + Other · with logos'),
+        Q('Break down by category?', 'drill down', 'break down my spending by category', 'Category rows · tap one to see its merchants'),
+        Q('Spending by card?', 'split bar', 'spending by card', 'One bar split by card'),
       ]],
       ['When', [
-        Q('My spending calendar?', 'calendar', 'show my spending calendar', 'Month grid · each day shaded by what went out', { tag: 'V19' }),
-        Q('Which days do I spend most?', 'weekdays', 'which days do I spend most', 'Average by weekday · last 8 weeks', { tag: 'V12' }),
-        Q('Food spending by week?', 'weekly bars', 'food spending by week', 'Weekly columns · usual line + band · current week hatched', { tag: 'V3' }),
-        Q('This month vs last?', 'pace line', 'how does this month compare with last month', 'Cumulative pace · this month vs last', { tag: 'V10' }),
+        Q('My spending calendar?', 'calendar', 'show my spending calendar', 'Month grid · each day shaded by what went out'),
+        Q('Which days do I spend most?', 'weekdays', 'which days do I spend most', 'Average by weekday · last 8 weeks'),
+        Q('Food spending by week?', 'weekly bars', 'food spending by week', 'Weekly columns · usual line + band · current week hatched'),
+        Q('This month vs last?', 'pace line', 'how does this month compare with last month', 'Cumulative pace · this month vs last'),
       ]],
       ['What changed', [
-        Q('What changed this month?', 'up / down', 'what changed this month', '↑↓ by category vs same days last month', { tag: 'V11' }),
-        Q('Categories vs last month?', 'dumbbell', 'what changed since last month by category', 'Each category: last month → this month, same days', { tag: 'V15' }),
-        Q('Categories month by month?', 'stacked', 'spending by category each month', 'Months as columns · top 3 categories a colour each, the rest grey', { tag: 'V6' }),
+        Q('What changed this month?', 'up / down', 'what changed this month', '↑↓ by category vs same days last month'),
+        Q('Categories vs last month?', 'dumbbell', 'what changed since last month by category', 'Each category: last month → this month, same days'),
+        Q('Categories month by month?', 'stacked', 'spending by category each month', 'Months as columns · top 3 categories a colour each, the rest grey'),
       ]],
       ['Split & compare', [
-        Q('Food vs transport?', 'face-off', 'food vs transport this month', 'Two subjects side by side', { tag: 'V2' }),
-        Q('Food vs shopping, 3 months?', 'grouped', 'compare food and shopping over the last 3 months', 'Months side by side · one colour per subject', { tag: 'V4' }),
-        Q('Food by card, 3 months?', 'by card', 'split food by month and by card', 'One view: months as columns, each card a colour · this month hatched', { tag: 'V6' }),
-        Q('Food: debit vs credit?', 'debit / credit', 'what are my food spend by last 3 weeks compare across cards split by type', 'Short window → one split bar, debit vs credit', { tag: 'V5' }),
-        Q('Split food by merchant', 'logos', 'split food by merchant', 'Ranked merchants with logos · tap one to see its payments', { tag: 'V7' }),
-        Q('Fuel vs food, debit vs credit?', '2 pages', 'compare my fuel with food last 3 months split by debit and credit', 'Two subjects → one page each · swipe or tap the dots', { tag: 'V6 ×2' }),
+        Q('Food vs transport?', 'face-off', 'food vs transport this month', 'Two subjects side by side'),
+        Q('Food vs shopping, 3 months?', 'grouped', 'compare food and shopping over the last 3 months', 'Months side by side · one colour per subject'),
+        Q('Food by card, 3 months?', 'by card', 'split food by month and by card', 'One view: months as columns, each card a colour · this month hatched'),
+        Q('Food: debit vs credit?', 'debit / credit', 'what are my food spend by last 3 weeks compare across cards split by type', 'Short window → one split bar, debit vs credit'),
+        Q('Split food by merchant', 'logos', 'split food by merchant', 'Ranked merchants with logos · tap one to see its payments'),
+        Q('Fuel vs food, debit vs credit?', '2 pages', 'compare my fuel with food last 3 months split by debit and credit', 'Two subjects → one page each · swipe or tap the dots'),
       ]],
       ['Watch-outs', [
-        Q('Anything unusual?', 'alerts', 'anything unusual', '> 3× a merchant’s usual · or “nothing unusual”', { tag: 'V21' }),
-        Q('Any declined payments?', 'declines', 'any declined payments?', 'Declined attempts with reasons · never counted in spend', { tag: 'V16' }),
-        Q('My subscriptions?', 'recurring', 'show my subscriptions', 'Recurring · 3+ months in a row', { tag: 'V14' }),
-        Q('How often at Brewline?', 'visits', 'how often do I go to brewline', 'Visits per week · last visit', { tag: 'V13' }),
+        Q('Anything unusual?', 'alerts', 'anything unusual', '> 3× a merchant’s usual · or “nothing unusual”'),
+        Q('Any declined payments?', 'declines', 'any declined payments?', 'Declined attempts with reasons · never counted in spend'),
+        Q('My subscriptions?', 'recurring', 'show my subscriptions', 'Recurring · 3+ months in a row'),
+        Q('How often at Brewline?', 'visits', 'how often do I go to brewline', 'Visits per week · last visit'),
       ]],
     ]],
     ['Stories', 'several turns and taps', [
@@ -210,7 +213,7 @@
           { tap: 'Everyday', note: 'picked · blocked · read back' } ] }),
         Q('Trip planning', '4 steps', '', 'unfreeze → travel dates → limit → weekly check', { steps: [
           { say: 'unfreeze my travel card', note: 'reversible · one step' },
-          { say: 'I’m travelling to Japan next week on my travel card', note: 'dates without a model' },
+          { say: 'I’m travelling to Japan next week on my travel card', note: 'Jev reads the dates' },
           { say: 'set a limit of $800 on my travel card', note: 'guard rail for the trip' },
           { say: 'food spending by week', note: 'weekly columns + usual line' } ] }),
         Q('New card setup', '4 steps', '', 'activate → confirm → ATM off → by card', { steps: [
@@ -227,7 +230,7 @@
       ['Everyday', [
         Q('Freeze my card and block Zipride', '2 steps', 'freeze my everyday card and block zipride', '2 parts → 2 rows · card carried over'),
         Q('Set a limit on my everyday card', 'asks amount', 'set a limit on my everyday card', 'Missing amount → chips → resumes'),
-        Q('Travelling to Japan next week', 'dates', 'I’m travelling to Japan next week', 'Dates without a model · allow first, then restrict'),
+        Q('Travelling to Japan next week', 'dates', 'I’m travelling to Japan next week', 'Jev reads the dates · allow first, then restrict'),
       ]],
       ['High stakes', [
         Q('I think my card was stolen', 'confirm', 'I think my card was stolen', 'Bar 0.70 · pick card · confirm'),
@@ -253,7 +256,7 @@
   const tryPanel = $('#try');
   const narrate = html => {
     $('#narrate').classList.remove('finished');
-    $('#narrate').innerHTML = `<span class="np"><i class="np-dot"></i><span class="np-label">Now playing</span><span>${html}</span></span><button class="btn sm np-open" type="button" aria-expanded="false" aria-controls="scenarios">Scenarios ${Icon('chevron-down', 14)}</button><i class="np-bar"></i>`;
+    $('#narrate').innerHTML = `<span class="np"><i class="np-dot"></i><span class="np-label">Now playing</span><span>${html}</span></span><button class="btn sm np-open" type="button" aria-expanded="false" aria-controls="scenarios">All scenarios ${Icon('chevron-down', 14)}</button><i class="np-bar"></i>`;
     $('#narrate .np-open').onclick = () => expand(true);
     A11y.announce(A11y.text(html));
   };
@@ -265,6 +268,17 @@
     const bar = $('#narrate');
     bar.innerHTML = `<span class="np done"><span class="np-ic">${Icon('check', 14)}</span><span class="np-txt"><small>Played</small><b>${s.q}</b></span></span>
       <span class="np-acts"><button class="btn sm np-all" type="button" aria-controls="scenarios">All scenarios ${Icon('chevron-down', 14)}</button><button class="btn sm np-next" type="button"><small>Next</small><span>${next.q}</span>${Icon('arrow-right', 14)}</button></span>`;
+    // Keep the rest of the gallery in sight: a few live thumbnails of what else there is.
+    const all = GROUPS.flatMap(g => g[2].flatMap(([, l]) => l)), total = all.length;
+    const more = [next, ...list.slice(list.indexOf(next) + 1), ...list].filter((x, i, a) => x !== s && a.indexOf(x) === i).slice(1, 4);
+    const strip = document.createElement('div'); strip.className = 'np-more';
+    strip.innerHTML = `<small>More to try</small>`;
+    more.forEach(x => { const c = card(x); c.classList.add('mini'); strip.appendChild(c); });
+    const seeAll = document.createElement('button'); seeAll.type = 'button'; seeAll.className = 'np-seeall';
+    seeAll.innerHTML = `<b>${total}</b><span>scenarios</span><em>See all ${Icon('arrow-right', 14)}</em>`;
+    seeAll.onclick = () => expand(true);
+    strip.appendChild(seeAll);
+    bar.appendChild(strip);
     bar.classList.add('finished');
     tryPanel.classList.remove('playing-now');
     bar.querySelector('.np-all').onclick = () => expand(true);
@@ -456,12 +470,51 @@
     finished(s);
   }
 
+  // ── first visit: one scenario plays by itself, the rest of the page dimmed around the phone and
+  //    the system flow. Any touch, key or wheel ends the spotlight at once; it never plays twice. ──
+  const INTRO_KEY = 'nova-intro-seen';
+  const seenIntro = () => { try { return localStorage.getItem(INTRO_KEY) === '1'; } catch (e) { return true; } };
+  const markIntro = () => { try { localStorage.setItem(INTRO_KEY, '1'); } catch (e) { /* private mode: fine */ } };
+  let introOn = false;
+  function endIntro() {
+    if (!introOn) return;
+    introOn = false;
+    document.body.classList.remove('intro');
+    const cap = document.querySelector('.intro-cap'); if (cap) { cap.classList.add('out'); setTimeout(() => cap.remove(), 300); }
+    ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(e => removeEventListener(e, endIntro, true));
+    tryPanel.classList.add('handoff'); setTimeout(() => tryPanel.classList.remove('handoff'), 1800);
+  }
+  async function playIntro() {
+    const s = GROUPS[0][2].flatMap(([, l]) => l).find(x => x.text === 'anything unusual');
+    if (!s || busy) return;
+    markIntro();
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    introOn = true;
+    const wide = matchMedia('(min-width: 1181px)').matches;   // phone and flow side by side → spotlight both
+    if (wide) document.body.classList.add('intro');
+    const cap = document.createElement('div'); cap.className = 'intro-cap'; cap.setAttribute('role', 'status');
+    cap.innerHTML = `<i></i><span>A question becomes UI</span><button type="button">Skip intro</button>`;
+    cap.querySelector('button').onclick = endIntro;
+    document.body.appendChild(cap);
+    const say = t => { if (introOn) cap.querySelector('span').textContent = t; };
+    const onHop = h => { if (h.to === 'jev') say('Jev picks the action'); if (h.to === 'insight') say('Jev picks the chart'); if (h.to === 'llm') say('The LLM words the answer'); };
+    const onDone = () => say('Code draws it from your data');
+    bus.on('hop', onHop); bus.on('turnDone', onDone);
+    setTimeout(() => ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(e => addEventListener(e, endIntro, true)), 300);
+    await play(s, cardFor(s.q));
+    await new Promise(r => setTimeout(r, 1600));
+    bus.off('hop', onHop); bus.off('turnDone', onDone);
+    endIntro();
+  }
+  $('#replay-intro').onclick = () => { scrollTo({ top: 0 }); setTimeout(playIntro, 400); };
+
   // keyboard: / → type into the phone · Esc → reopen scenarios
   document.addEventListener('keydown', e => {
     if (e.key === '/' && document.activeElement !== input) { e.preventDefault(); showPhone().then(() => input.focus({ preventScroll: true })); }
     if (e.key === 'Escape') { if (rec) { rec.abort(); return; } const back = tryPanel.classList.contains('collapsed'); expand(back); if (!back) input.blur(); }
   });
 
+  if (!seenIntro()) setTimeout(playIntro, 1400);
   Phone.renderCards();
   const openingState = () => {
     if (Phone.started()) return;

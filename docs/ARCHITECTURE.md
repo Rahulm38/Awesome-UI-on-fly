@@ -4,12 +4,12 @@ Nova splits one hard problem — *understand a sentence and change a bank card s
 
 | Part | Job | Why it's separate |
 |---|---|---|
-| **Jev** (decision model) | Picks **which** action, from a closed catalogue, with a score per choice | A closed set can't invent an action. Scores make thresholds possible. Fast enough to run on every keystroke |
-| **LLM** | Pulls **open values** out of the sentence: amounts, merchants, countries, periods | Good at language, bad at being a gate. It never picks the action |
-| **Rules decider** | Answers when both models are down | Slower and blunter, but the conversation never dies |
+| **Jev** (decision model) | Decides **everything**: the action from a closed catalogue, with a score per choice, **and** its values (amount, merchant, dates, card), in one batched call per turn | A closed set can't invent an action. Scores make thresholds possible. Fast enough to run on every keystroke |
+| **LLM** | Writes **words only**: an answer's headline, follow-up wording, advice wording | Good at language, bad at being a gate. Never decides, never extracts values, never on keystrokes or bank writes |
+| **Screen link** | When Jev is down: “I can't understand requests right now” + a button to the screen that can do it | No second decider. Says so instead of guessing |
 | **Safety gate** | Deterministic checks between any model output and the bank | The only door to a write. No model output passes around it |
 | **Bank API** | Write, then **read back** | A ✓ is shown only when the read-back confirms the write |
-| **Insights** | Reads a spending question into closed lists, picks a chart from the data's shape, builds the panel | Pure and fast (< 15 ms) over a warm in-memory snapshot |
+| **Insights** | Jev reads which chart the question asks for; deterministic code builds the panel | < 15 ms over a warm in-memory 6-month snapshot |
 | **UI composer** | Turns results into UI blocks | The phone draws primitives; it knows nothing about banking |
 
 ## System view
@@ -17,17 +17,16 @@ Nova splits one hard problem — *understand a sentence and change a bank card s
 ```mermaid
 flowchart LR
   P[Phone · Nova UI] -->|turn| O[Orchestrator]
-  O -->|parts| J[Jev<br/>decision model]
-  O -->|parts| L[LLM<br/>slot extraction]
-  O -.->|both down| R[Rules<br/>fallback]
-  O -->|question| N[Insights<br/>snapshot + chooser]
+  O -->|parts| J[Jev<br/>action + values]
+  O -.->|Jev down| R[Screen link<br/>if Jev is down]
+  O -->|which chart| N[Insights<br/>snapshot + chart build]
   N -->|6-month read, single flight| B
   J --> S{Safety gate}
-  L --> S
-  R --> S
   S -->|act| B[(Bank API)]
   B -->|read-back| S
   S --> C[UI composer]
+  C -.->|answers only| L[LLM<br/>wording]
+  R --> C
   C -->|blocks| P
 ```
 
@@ -44,13 +43,12 @@ sequenceDiagram
   participant C as Composer
   P->>O: { text, screen context }
   par in parallel
-    O->>J: which action? (closed set)
-    J-->>O: scores + verdict   ~30–80 ms
+    O->>J: which action + values? (one batched call)
+    J-->>O: scores + verdict + values   ≈ 450 ms
   and
-    O->>L: which values?
-    L-->>O: amount, merchant, dates…   ~400–900 ms
-  and
-    O->>O: insights over the warm snapshot   ~5–15 ms
+    O->>J: which chart?
+    J-->>O: chart id   ≈ 450 ms (or reused from typing)
+    O->>O: build the chart from the warm snapshot   < 15 ms
   end
   O->>S: proposals
   S->>S: catalogue · card resolution · eligibility · sanitise · lane
@@ -62,9 +60,22 @@ sequenceDiagram
   else lane = confirm / ask
     S-->>O: wait for the person
   end
+  opt answers only
+    O->>L: word the headline (numbers as placeholders)   ≤ 1.5 s
+    L-->>O: wording, or templated wording on failure
+    O->>J: check the wording
+  end
   O->>C: results
   C-->>P: UI blocks
 ```
+
+- One batched Jev call per turn (~44 questions answered in parallel server-side)
+- Jev warm: p50 ≈ 450 ms · p95 ≈ 0.6–1.1 s · first call of a session ≈ 0.7 s (pre-warmed when the sheet opens)
+- Turn budget 7.0 s = first attempt 5.0 s + one retry after 0.25 s · chart call 4.0 s
+- Headline wait capped at 1.5 s (typical 0.6–0.9 s) · on failure → templated wording
+- Bank write → read-back → ✓ · bank timings are simulated
+- A sent turn is typically ~1.5–3.5 s end to end
+- Jev down → “I can't understand requests right now” + a button to the screen that can
 
 ## A keystroke (score as you type)
 
@@ -72,17 +83,28 @@ sequenceDiagram
 sequenceDiagram
   participant P as Phone
   participant J as Jev
-  P->>P: debounce 120 ms, request #n
-  P->>J: text so far + screen context
-  J-->>P: scores + verdict
-  alt #n is still the newest request
+  P->>P: 3rd char · word end / backspace · else 180 ms quiet → request #n
+  par side by side
+    P->>J: tray: text so far + screen context
+    J-->>P: scores + verdict
+  and
+    P->>J: which chart?
+    J-->>P: chart id
+  end
+  alt #n is newest shown and its text is still in the box
     P->>P: draw the action tray
-  else a newer request exists
+  else stale
     P->>P: drop this answer
   end
 ```
 
-Only Jev answers keystrokes. The LLM and rules never do: if Jev is unavailable the tray is **absent**, not slow or blunt. The tray never writes anything. A tap on it builds an ordinary turn (your words plus the card you picked) and sends it down the same path as pressing send, so there is exactly one route to a bank write.
+- Only Jev answers keystrokes: one tray call + one chart call, side by side · the LLM never does
+- First call at the 3rd character (no wait) · again at once at each word end or backspace · otherwise after 180 ms of quiet inside a word
+- ≤ 3 tray calls in flight (2 for charts) · tray budget 2.5 s, no retry
+- An answer is used only if its text is still in the box and it's newer than the last one shown
+- The tray lands ≈ 0.6 s after the 3rd character
+- Jev down → no tray: **absent**, not slow or blunt
+- The tray never writes. A tap builds an ordinary turn (your words + the card you picked) down the same path as send: one route to a bank write
 
 ## From verdict to UI
 
@@ -99,7 +121,9 @@ flowchart TD
   A -->|ask| K[chips for the missing value or card]
 ```
 
-The composer picks the view from the question. Ask about a category and you get weekly bars. Ask where the money went and you get bars by category. A week with no spending is drawn without a `$0` label.
+- Jev reads which chart the question asks for; deterministic code builds it from the snapshot in < 15 ms
+- Snapshot: fresh 120 s · stale-served ≤ 30 min while one refresh runs · single-flight · cold load ≈ 65 ms · warmed when the sheet opens
+- A week with no spending is drawn without a `$0` label
 
 ## Lanes
 
@@ -126,8 +150,10 @@ Scores may order the picker. They never remove a card from it.
 
 | Name | Value | Meaning |
 |---|---|---|
-| act | 0.60 | the lowest score an action needs to be asserted |
-| high-stakes | 0.70 | the bar for report lost/stolen and disputes |
-| handoff | 0.50 | a named screen for an out-of-scope request |
-| candidate floor | 0.35 | the lowest score that still counts as a plausible reading |
-| margin | 0.15 | how far the winner must lead any plausible rival |
+| act | 0.50 | an action's `act_*` Noul must reach this to pass |
+| high-stakes | 0.70 | report lost/stolen and disputes (or `route` agreeing at 0.80) |
+| handoff | 0.50 | `handoff_screen` names a screen for an out-of-scope request |
+| candidate floor | 0.25 | a reading this likely is offered in "did you mean" (2–3 shown) |
+| tie margin | 0.10 | readings closer than this are a tie; `route` breaks it |
+| route veto | 0.70 | `route` = NONE this sure vetoes any action |
+| lane · act / ask | 0.85 / 0.60 | the safety gate acts at 0.85 (unfreeze 0.90), else confirms or asks |

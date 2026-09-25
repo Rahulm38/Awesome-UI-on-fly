@@ -13,22 +13,22 @@
   <meta property="og:type" content="website">
   <!-- Share preview. Once the site is live, change og-image.png below to its FULL address,
        e.g. https://<you>.github.io/<repo>/og-image.png — LinkedIn and Facebook need an absolute URL. -->
-  <meta property="og:image" content="og-image.png">
+  <meta property="og:image" content="https://rahulm38.github.io/Awesome-UI-on-fly/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Awesome UI on Fly — a phone drawing a spending chart on the fly, beside a live HUD of the Jev, LLM and insights calls.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Awesome UI on Fly">
   <meta name="twitter:description" content="Decisions and interfaces made on the fly — every model call, score and timing shown live.">
-  <meta name="twitter:image" content="og-image.png">
+  <meta name="twitter:image" content="https://rahulm38.github.io/Awesome-UI-on-fly/og-image.png">
   <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="site.css?v=81">
-  <link rel="stylesheet" href="phone.css?v=81">
+  <link rel="stylesheet" href="site.css?v=93">
+  <link rel="stylesheet" href="phone.css?v=93">
 </head>
 <body>
   <header class="top">
     <a class="brand" href="#"><span class="mark"><svg viewBox="0 0 24 24"><use href="#i-sparkle"/></svg></span><b>Awesome UI on Fly</b></a>
-    <nav class="top-nav"><a class="btn sm" href="architecture.html">How it works</a></nav>
+    <nav class="top-nav"><a class="hiw" href="architecture.html"><span class="hiw-in"><svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2.5c.5 4.4 2.6 6.5 7 7-4.4.5-6.5 2.6-7 7-.5-4.4-2.6-6.5-7-7 4.4-.5 6.5-2.6 7-7z"/></svg>How it works<svg class="ico hiw-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span></a></nav>
   </header>
 
   <section class="hero">
@@ -90,8 +90,8 @@
       </div>
 
       <div class="panel" id="flow-panel">
-        <div class="ph"><h2>System flow</h2><small id="trace-label">waiting for a message</small><div class="r"><span class="sim-l" title="Simulation only — no real model is called">Simulate</span><label class="tg" title="Simulation only · turn Jev off and the LLM decides instead; the typing tray goes quiet"><input type="checkbox" data-model="jev" checked aria-label="Simulate Jev up or down"><span></span>Jev</label><label class="tg" title="Simulation only · turn the LLM off and rules extract the values"><input type="checkbox" data-model="llm" checked aria-label="Simulate LLM up or down"><span></span>LLM</label><label class="tg tg-out" title="Simulation only — Jev and the LLM are still called but time out (700 ms / 1.2 s); the rules fallback answers."><input type="checkbox" id="outage" aria-label="Simulate a model outage: Jev and the LLM time out"><span></span>Outage</label><span class="live" id="live"><i></i>idle</span></div></div>
-        <div class="flow-wrap"><svg id="flow" role="img" aria-label="Request pipeline: client, orchestrator, then Jev, LLM and Insights in parallel (rules as fallback), safety gate, core banking, UI composer, back to the client. It animates each live request; the line below describes the current stage."></svg></div>
+        <div class="ph"><h2>System flow</h2><small id="trace-label">waiting for a message</small><div class="r"><div class="sim" role="group" aria-label="Simulate models (nothing real is called)"><span class="sim-l">Simulate</span><label class="chip-tg" title="Jev picks the action and reads its values. Off: nothing decides — the phone says so and links to the right screen; the typing tray goes quiet."><input type="checkbox" data-model="jev" checked aria-label="Jev"><span><i></i>Jev</span></label><label class="chip-tg" title="The LLM only words answers (headlines), never decides. Off: templated wording, same decisions."><input type="checkbox" data-model="llm" checked aria-label="LLM"><span><i></i>LLM</span></label><label class="chip-tg out" title="Jev times out (5.0 s + one retry, 7.0 s budget) and the phone links to the right screen; the LLM misses its 1.5 s cap and templated words are used."><input type="checkbox" id="outage" aria-label="Model outage"><span><i></i>Outage</span></label></div></div></div>
+        <div class="flow-wrap"><span class="live" id="live"><i></i>idle</span><svg id="flow" role="img" aria-label="Request pipeline: client, orchestrator, then Jev, LLM and Insights in parallel (rules as fallback), safety gate, core banking, UI composer, back to the client. It animates each live request; the line below describes the current stage."></svg></div>
         <div class="flow-say" id="flow-say"><i></i><span></span></div>
         <div class="summary" id="summary"><span>Waiting for the first request</span></div>
       </div>
@@ -118,24 +118,24 @@
     </section>
   </main>
 
-  <footer class="foot"><span>Fictional data · no network calls</span><span><button class="linkish" id="shuffle" type="button" title="Reload with different fictional data">Shuffle data</button> · <a href="architecture.html">How it works</a></span></footer>
+  <footer class="foot"><span>Fictional data · no network calls</span><span><button class="linkish" id="replay-intro" type="button">Replay intro</button> · <button class="linkish" id="shuffle" type="button" title="Reload with different fictional data">Shuffle data</button> · <a href="architecture.html">How it works</a></span></footer>
 
   <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
     <symbol id="i-sparkle" viewBox="0 0 24 24"><path fill="currentColor" d="M10 2.5c.5 4.4 2.6 6.5 7 7-4.4.5-6.5 2.6-7 7-.5-4.4-2.6-6.5-7-7 4.4-.5 6.5-2.6 7-7zM18.5 13c.25 2 1.2 3 3.2 3.2-2 .25-3 1.2-3.2 3.2-.25-2-1.2-3-3.2-3.2 2-.25 3-1.2 3.2-3.2zM5 16.5c.2 1.5.9 2.2 2.4 2.4-1.5.2-2.2.9-2.4 2.4-.2-1.5-.9-2.2-2.4-2.4 1.5-.2 2.2-.9 2.4-2.4z"/></symbol>
   </defs></svg>
 
-  <script src="js/icons.js?v=81"></script>
-  <script src="js/a11y.js?v=81"></script>
-  <script src="js/flowgraph.js?v=81"></script>
-  <script src="js/data.js?v=81"></script>
-  <script src="js/jev.js?v=81"></script>
-  <script src="js/llm.js?v=81"></script>
-  <script src="js/insights.js?v=81"></script>
-  <script src="js/engine.js?v=81"></script>
-  <script src="js/charts.js?v=81"></script>
-  <script src="js/phone.js?v=81"></script>
-  <script src="js/inspector.js?v=81"></script>
-  <script src="js/correct.js?v=81"></script>
-  <script src="js/main.js?v=81"></script>
+  <script src="js/icons.js?v=93"></script>
+  <script src="js/a11y.js?v=93"></script>
+  <script src="js/flowgraph.js?v=93"></script>
+  <script src="js/data.js?v=93"></script>
+  <script src="js/jev.js?v=93"></script>
+  <script src="js/llm.js?v=93"></script>
+  <script src="js/insights.js?v=93"></script>
+  <script src="js/engine.js?v=93"></script>
+  <script src="js/charts.js?v=93"></script>
+  <script src="js/phone.js?v=93"></script>
+  <script src="js/inspector.js?v=93"></script>
+  <script src="js/correct.js?v=93"></script>
+  <script src="js/main.js?v=93"></script>
 </body>
 </html>

@@ -10,7 +10,7 @@
   <title>Awesome UI on Fly · How it works</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230e7490%22/%3E%3Cpath fill=%22%23ecfeff%22 d=%22M13 6c.7 5.8 3.4 8.5 9.2 9.2-5.8.7-8.5 3.4-9.2 9.2-.7-5.8-3.4-8.5-9.2-9.2 5.8-.7 8.5-3.4 9.2-9.2z%22/%3E%3C/svg%3E">
   <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="site.css?v=81">
+  <link rel="stylesheet" href="site.css?v=93">
   <style>
     .doc-wrap { max-width: 1040px; margin: 0 auto; padding: 8px 28px 48px; }
     .doc-wrap h1 { font: 600 clamp(24px, 2.6vw, 32px)/1.15 var(--display); letter-spacing: -.025em; margin: 28px 0 0; }
@@ -59,41 +59,106 @@
   <header class="top"><a class="brand" href="index.html"><span class="mark"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M10 2.5c.5 4.4 2.6 6.5 7 7-4.4.5-6.5 2.6-7 7-.5-4.4-2.6-6.5-7-7 4.4-.5 6.5-2.6 7-7zM18.5 13c.25 2 1.2 3 3.2 3.2-2 .25-3 1.2-3.2 3.2-.25-2-1.2-3-3.2-3.2 2-.25 3-1.2 3.2-3.2zM5 16.5c.2 1.5.9 2.2 2.4 2.4-1.5.2-2.2.9-2.4 2.4-.2-1.5-.9-2.2-2.4-2.4 1.5-.2 2.2-.9 2.4-2.4z"/></svg></span><b>Awesome UI on Fly</b></a><a class="btn sm" href="index.html"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>Live demo</a></header>
 
   <main class="doc-wrap"><h1>How it works</h1>
-    <ul class="points"><li><b>Jev</b> decides</li><li><b>LLM</b> fills in</li><li><b>Gate</b> guards · only door to the bank</li><li><b>Phone</b> only renders blocks</li></ul>
+    <ul class="points"><li><b>Jev</b> decides · action + values</li><li><b>LLM</b> only words answers</li><li><b>Gate</b> guards · only door to the bank</li><li><b>Phone</b> only renders blocks</li></ul>
 
     <svg width="0" height="0" style="position:absolute"><defs><marker id="h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#22d3ee99"/></marker></defs></svg>
 
     <h2>System view</h2>
     <figure class="fig fig-live">
-      <div class="flow-wrap"><svg id="flow" role="img" aria-label="Request pipeline: client, orchestrator, then Jev, LLM and Insights in parallel (rules as fallback), safety gate, core banking, UI composer, back to the client."></svg></div>
+      <div class="flow-wrap"><svg id="flow" role="img" aria-label="Request pipeline: client, orchestrator, Jev decides action and values (screen link if Jev is down), Insights draws charts, safety gate, core banking, UI composer with LLM wording, back to the client."></svg></div>
       <div class="flow-say"><i></i><span>a sample turn plays through the pipeline</span></div>
-      <figcaption>Jev ∥ LLM ∥ Insights · both models down → rules · the demo draws every real request on this graph</figcaption>
+      <figcaption>Jev decides · LLM only words · Jev down → screen link · the demo draws every real request on this graph</figcaption>
     </figure>
 
     <div class="tscroll"><table>
       <tr><th>Part</th><th>Job</th><th>Why separate</th></tr>
-      <tr><td><b>Jev</b></td><td>Picks the action · closed set · scores</td><td>Can’t invent · thresholds · per-keystroke fast</td></tr>
-      <tr><td><b>LLM</b></td><td>Extracts values: amount, merchant, dates</td><td>Good at language · never picks the action</td></tr>
-      <tr><td><b>Insights</b></td><td>Question → chart from data shape</td><td>Pure · &lt; 15 ms · warm snapshot</td></tr>
-      <tr><td><b>Rules</b></td><td>Answers when models are down</td><td>Blunt but always there</td></tr>
+      <tr><td><b>Jev</b></td><td>Decides action + values (amount, merchant, dates, card) · one batched call</td><td>Can’t invent · thresholds · per-keystroke fast</td></tr>
+      <tr><td><b>LLM</b></td><td>Words only: answer headline · follow-ups · advice</td><td>Never decides · never extracts values · never on keystrokes or writes</td></tr>
+      <tr><td><b>Insights</b></td><td>Jev picks the chart · code draws it</td><td>Deterministic · &lt; 15 ms · warm snapshot</td></tr>
+      <tr><td><b>Screen link</b></td><td>Jev down → “can’t understand requests right now” + button to the screen</td><td>Says so · no second decider</td></tr>
       <tr><td><b>Safety gate</b></td><td>Card · eligibility · values · lane</td><td>Only door to a write</td></tr>
       <tr><td><b>Bank</b></td><td>Write → read-back</td><td>✓ only after read-back</td></tr>
       <tr><td><b>Composer</b></td><td>Results → UI blocks</td><td>Phone only renders</td></tr>
     </table></div>
 
+    <h2 id="jev-call">Inside a Jev call <small>one POST · a batch of questions · one answer each</small></h2>
+    <section class="jx" id="jx" aria-label="Inside a Jev call">
+      <h3 class="jx-h">Three question types</h3>
+      <div class="jx-types">
+        <article class="jx-card" id="jx-choice">
+          <header><b>Choice</b><span>pick one option · “nothing” is an option</span></header>
+          <code class="jx-snip"><i>asks</i>{"type":"choice","criteria":{"FREEZE":"Freeze, lock or block a whole card.", …, "NONE":"None of the other options describe the user's request."}}</code>
+          <div class="jx-query">query <q>freeze my card</q></div>
+          <div class="jx-viz"></div>
+          <code class="jx-snip jx-got"><i>gets</i><span>{"type":"choice","choice":"FREEZE","confidence":0.89,"probabilities":{…}}</span></code>
+        </article>
+        <article class="jx-card" id="jx-noul">
+          <header><b>Noul</b><span>one yes-probability · 0–1</span></header>
+          <code class="jx-snip"><i>asks</i>{"type":"noul","instructions":"Does the user want a whole card frozen, locked, paused or blocked?"}</code>
+          <div class="jx-query">query <q>freeze my card</q></div>
+          <div class="jx-viz"></div>
+          <code class="jx-snip jx-got"><i>gets</i><span>{"type":"noul","noul":0.82}</span></code>
+        </article>
+        <article class="jx-card" id="jx-score">
+          <header><b>Score</b><span>a position on an ordered scale</span></header>
+          <code class="jx-snip"><i>asks</i>{"type":"score","criteria":["a single lookup","an aggregation","a comparison"]}</code>
+          <div class="jx-query">query <q>last coffee charge?</q></div>
+          <div class="jx-viz"></div>
+          <code class="jx-snip jx-got"><i>gets</i><span>{"type":"score","score":0.02,"confidence":0.98,"probabilities":{"0":0.99,"1":0.01}}</span></code>
+        </article>
+      </div>
+
+      <h3 class="jx-h">One call, step by step</h3>
+      <div class="jx-walk" id="jx-walk">
+        <div class="jx-bar">
+          <div class="jx-tabs" role="tablist" aria-label="Example requests"></div>
+          <button type="button" class="jx-replay" aria-label="Replay this example"></button>
+        </div>
+        <ol class="jx-steps" aria-hidden="true"><li>request</li><li>answers</li><li>decision</li><li>outcome</li></ol>
+        <div class="jx-grid">
+          <div class="jx-pane jx-req"><div class="jx-ph"><b>1 · request</b><small>POST · one per turn</small></div><pre></pre></div>
+          <div class="jx-col">
+            <div class="jx-pane jx-ans"><div class="jx-ph"><b>2 · answers</b><small>one per question id</small></div><div class="jx-rows"></div></div>
+            <div class="jx-pane jx-dec"><div class="jx-ph"><b>3 · decision</b><small>real constants · this page’s simulated numbers</small></div><ol class="jx-checks"></ol></div>
+          </div>
+        </div>
+        <div class="jx-out" aria-live="polite"><span class="jx-ph"><b>4 · outcome</b></span><code></code><small></small></div>
+      </div>
+
+      <h3 class="jx-h">What we configured</h3>
+      <p class="jx-note">Field names, question types and thresholds are the real ones · the numbers are this demo’s simulated answers · instruction text shown only where the project’s own is</p>
+      <div class="jx-cfg">
+        <div><h4>sent</h4><ul>
+          <li><b>model</b><span>jev-1.13.0 · pinned</span></li>
+          <li><b>questions</b><span>≈ 85 per turn · ≈ 36 per keystroke · ≈ 24 per chart</span></li>
+          <li><b>state</b><span>query · screen · cards · selected_card_id · locale · today · on_screen_transaction (only when shown) · nothing else</span></li>
+          <li><b>cards</b><span>cardId · displayName · last4 · isFreezed</span></li>
+          <li><b>timeouts</b><span>turn 5.0 s + 1 retry (7.0 s budget) · tray 2.5 s · chart 4.0 s</span></li>
+        </ul></div>
+        <div><h4>received</h4><ul>
+          <li><b>answers</b><span>one per question id</span></li>
+          <li><b>choice</b><span>choice · confidence · probabilities</span></li>
+          <li><b>noul</b><span>one yes-probability 0–1</span></li>
+          <li><b>score</b><span>score · confidence · probabilities</span></li>
+          <li><b>nothing</b><span>an option (NONE · NO_MATCH · OTHER) · never a flag</span></li>
+          <li><b>not used</b><span>no logprobs</span></li>
+        </ul></div>
+      </div>
+    </section>
+
     <h2>A turn — press send</h2>
     <figure class="fig">
-      <svg viewBox="0 0 900 430">
+      <svg viewBox="0 0 900 500">
         <g class="lbl" text-anchor="middle" style="font-size:12.5px;fill:#e5edf7;font-weight:600">
-          <text x="60" y="22">Phone</text><text x="190" y="22">Orchestrator</text><text x="330" y="22">Jev</text><text x="450" y="22">LLM</text><text x="590" y="22">Safety gate</text><text x="720" y="22">Bank</text><text x="840" y="22">Composer</text>
+          <text x="60" y="22">Phone</text><text x="190" y="22">Orchestrator</text><text x="330" y="22">Jev</text><text x="450" y="22">LLM (words)</text><text x="590" y="22">Safety gate</text><text x="720" y="22">Bank</text><text x="840" y="22">Composer</text>
         </g>
-        <g class="life"><path d="M60 32V420M190 32V420M330 32V420M450 32V420M590 32V420M720 32V420M840 32V420"/></g>
+        <g class="life"><path d="M60 32V490M190 32V490M330 32V490M450 32V490M590 32V490M720 32V490M840 32V490"/></g>
         <path class="sq" d="M60 55H188"/><text class="lbl" x="70" y="49">text + screen context</text>
-        <rect class="grp" x="180" y="68" width="290" height="92" rx="8"/><text class="lbl" x="392" y="84">in parallel</text>
-        <path class="sq" d="M190 95H328"/><text class="lbl" x="200" y="90">which action?</text>
-        <path class="sq ret" d="M330 112H192"/><text class="lbl" x="232" y="108">scores · 30–80 ms</text>
-        <path class="sq" d="M190 132H448"/><text class="lbl" x="360" y="127">which values?</text>
-        <path class="sq ret" d="M450 150H192"/><text class="lbl" x="330" y="146">slots · 400–900 ms</text>
+        <rect class="grp" x="180" y="68" width="260" height="92" rx="8"/><text class="lbl" x="352" y="84">in parallel</text>
+        <path class="sq" d="M190 95H328"/><text class="lbl" x="200" y="90">which action + values?</text>
+        <path class="sq ret" d="M330 112H192"/><text class="lbl" x="206" y="108">one call ≈ 450 ms</text>
+        <path class="sq" d="M190 132H328"/><text class="lbl" x="200" y="127">which chart?</text>
+        <path class="sq ret" d="M330 150H192"/><text class="lbl" x="206" y="146">Jev ≈ 450 ms</text>
         <path class="sq" d="M190 185H588"/><text class="lbl" x="400" y="180">proposals</text>
         <text class="lbl" x="598" y="208">catalogue · card · eligibility · values · lane</text>
         <rect class="grp" x="580" y="222" width="160" height="92" rx="8"/><text class="lbl" x="588" y="236">lane = act</text>
@@ -101,36 +166,41 @@
         <path class="sq" d="M590 280H718"/><text class="lbl" x="620" y="275">read-back</text>
         <path class="sq ret" d="M720 300H592"/><text class="lbl" x="630" y="296">verified</text>
         <path class="sq ret" d="M590 340H192"/><text class="lbl" x="330" y="335">results (done · confirm · ask · read)</text>
-        <path class="sq" d="M190 365H838"/><text class="lbl" x="480" y="360">compose</text>
-        <path class="sq ret" d="M840 395H62"/><text class="lbl" x="400" y="390">UI blocks</text>
+        <rect class="grp" x="180" y="346" width="290" height="80" rx="8"/><text class="lbl" x="382" y="418">answers only</text>
+        <path class="sq" d="M190 368H448"/><text class="lbl" x="200" y="363">word the headline ≤ 1.5 s</text>
+        <path class="sq ret" d="M450 384H192"/><text class="lbl" x="260" y="380">wording · numbers as placeholders</text>
+        <path class="sq" d="M190 402H328"/><text class="lbl" x="200" y="397">Jev checks it</text>
+        <path class="sq" d="M190 445H838"/><text class="lbl" x="480" y="440">compose</text>
+        <path class="sq ret" d="M840 475H62"/><text class="lbl" x="400" y="470">UI blocks</text>
       </svg>
       <ol class="steps-m" aria-hidden="true">
         <li><b>Phone → Orchestrator</b><span>text + screen context</span></li>
-        <li><b>Jev + LLM, in parallel</b><span>which action? 30–80 ms · which values? 400–900 ms</span></li>
+        <li><b>Jev, in parallel</b><span>which action + values? one call ≈ 450 ms · which chart? ≈ 450 ms</span></li>
         <li><b>Safety gate</b><span>catalogue · card · eligibility · values · lane</span></li>
         <li><b>Bank</b><span>lane = act → write → read-back → verified</span></li>
+        <li><b>Answers only</b><span>LLM words the headline ≤ 1.5 s → Jev checks it · fails → template</span></li>
         <li><b>Composer</b><span>results (done · confirm · ask · read) → UI blocks</span></li>
       </ol>
-      <figcaption>Every hop → latency panel + payloads</figcaption>
+      <figcaption>Every hop → latency panel + payloads · typically 1.5–3.5 s · Jev down → “can’t understand” + screen link</figcaption>
     </figure>
 
     <h2>A keystroke — score as you type</h2>
     <figure class="fig">
       <svg viewBox="0 0 900 190">
-        <g class="b"><rect x="20" y="60" width="150" height="56" rx="10" stroke="#94a3b8"/><text class="t" x="95" y="84">Keystroke #n</text><text class="s" x="95" y="102">debounce 120 ms</text></g>
-        <g class="b"><rect x="230" y="60" width="150" height="56" rx="10" stroke="#a78bfa"/><text class="t" x="305" y="84">Jev only</text><text class="s" x="305" y="102">no LLM · no writes</text></g>
-        <g class="b"><rect x="440" y="60" width="170" height="56" rx="10" stroke="#38bdf8"/><text class="t" x="525" y="84">Is #n the newest?</text><text class="s" x="525" y="102">older answers are dropped</text></g>
+        <g class="b"><rect x="20" y="60" width="150" height="56" rx="10" stroke="#94a3b8"/><text class="t" x="95" y="80">Keystroke #n</text><text class="s" x="95" y="96">3rd char · word end</text><text class="s" x="95" y="108">· 180 ms quiet</text></g>
+        <g class="b"><rect x="230" y="60" width="150" height="56" rx="10" stroke="#a78bfa"/><text class="t" x="305" y="80">Jev only</text><text class="s" x="305" y="96">2 calls: tray + chart</text><text class="s" x="305" y="108">no LLM · no writes</text></g>
+        <g class="b"><rect x="440" y="60" width="170" height="56" rx="10" stroke="#38bdf8"/><text class="t" x="525" y="80">Still current?</text><text class="s" x="525" y="96">newest · text unchanged</text><text class="s" x="525" y="108">older answers are dropped</text></g>
         <g class="b"><rect x="680" y="14" width="200" height="56" rx="10" stroke="#34d399"/><text class="t" x="780" y="38">Draw the action tray</text><text class="s" x="780" y="56">action · did you mean · handoff</text></g>
         <g class="b"><rect x="680" y="112" width="200" height="56" rx="10" stroke="#f87171"/><text class="t" x="780" y="136">Drop it</text><text class="s" x="780" y="154">never paint over a newer answer</text></g>
         <path class="ar" d="M170 88H228"/><path class="ar" d="M380 88H438"/><path class="ar" d="M610 78L678 48"/><path class="ar" d="M610 98L678 134"/>
         <text class="lbl" x="628" y="54">yes</text><text class="lbl" x="628" y="136">no</text>
       </svg>
       <ol class="steps-m" aria-hidden="true">
-        <li><b>Keystroke #n</b><span>debounce 120 ms</span></li>
-        <li><b>Jev only</b><span>no LLM · no writes</span></li>
-        <li><b>Is #n the newest?</b><span>yes → draw the action tray · no → drop it</span></li>
+        <li><b>Keystroke #n</b><span>3rd char · word end · 180 ms quiet</span></li>
+        <li><b>Jev only</b><span>2 calls side by side: tray + chart · no LLM · no writes</span></li>
+        <li><b>Still current?</b><span>newest + text unchanged → draw the action tray · else → drop it</span></li>
       </ol>
-      <figcaption>Jev down → no tray · tray tap = ordinary turn · one road to the bank</figcaption>
+      <figcaption>Tray ≈ 0.6 s after the 3rd char · ≤ 3 tray / 2 chart calls in flight · Jev down → no tray · tray tap = ordinary turn</figcaption>
     </figure>
 
     <h2>From verdict to UI</h2>
@@ -151,11 +221,27 @@
     <h2>Thresholds</h2>
     <div class="tscroll"><table>
       <tr><th>Name</th><th>Value</th><th>Meaning</th></tr>
-      <tr><td><code>act</code></td><td>0.60</td><td>act</td></tr>
-      <tr><td><code>highStakes</code></td><td>0.70</td><td>irreversible</td></tr>
-      <tr><td><code>handoff</code></td><td>0.50</td><td>name a screen</td></tr>
-      <tr><td><code>candidateFloor</code></td><td>0.35</td><td>plausible reading</td></tr>
-      <tr><td><code>margin</code></td><td>0.15</td><td>lead over runner-up</td></tr>
+      <tr><td><code>act_*</code> noul</td><td>0.50</td><td>an action passes</td></tr>
+      <tr><td>high stakes</td><td>0.70</td><td>lost / stolen, dispute · or <code>route</code> agrees ≥ 0.80</td></tr>
+      <tr><td>tie margin</td><td>0.10</td><td>closer than this → <code>route</code> breaks it</td></tr>
+      <tr><td><code>route</code> NONE</td><td>0.70</td><td>vetoes any action</td></tr>
+      <tr><td>out of scope</td><td>0.55 · 0.60</td><td><code>route</code> · <code>out_of_scope</code> noul</td></tr>
+      <tr><td><code>handoff_screen</code></td><td>0.50</td><td>names a screen</td></tr>
+      <tr><td>did you mean</td><td>0.25</td><td>floor · 2–3 shown</td></tr>
+      <tr><td>card</td><td>0.95 · 0.60</td><td>named card · all cards</td></tr>
+      <tr><td>gate lane</td><td>0.85 · 0.60</td><td>act (unfreeze 0.90) · else confirm / ask</td></tr>
+    </table></div>
+
+    <h2>Timing</h2>
+    <div class="tscroll"><table>
+      <tr><th>Call</th><th>Typical</th><th>Budget</th></tr>
+      <tr><td><b>Jev · turn</b></td><td>p50 ≈ 450 ms · p95 0.6–1.1 s · first ≈ 0.7 s (pre-warmed)</td><td>7.0 s = 5.0 s + one retry after 0.25 s</td></tr>
+      <tr><td><b>Jev · tray</b></td><td>lands ≈ 0.6 s after 3rd char</td><td>2.5 s · no retry</td></tr>
+      <tr><td><b>Jev · chart</b></td><td>≈ 450 ms · or reused from typing 60 s</td><td>4.0 s</td></tr>
+      <tr><td><b>LLM · headline</b></td><td>0.6–0.9 s · answers only</td><td>1.5 s → templated wording</td></tr>
+      <tr><td><b>Chart build</b></td><td>&lt; 15 ms · 6-month snapshot</td><td>fresh 120 s · stale ≤ 30 min · cold ≈ 65 ms</td></tr>
+      <tr><td><b>Bank</b></td><td>write → read-back → ✓</td><td>simulated</td></tr>
+      <tr><td><b>Sent turn</b></td><td>≈ 1.5–3.5 s end to end</td><td></td></tr>
     </table></div>
 
     <h2>Safeguards <small>this page · a real deployment</small></h2>
@@ -182,14 +268,18 @@
       <div class="rule"><b>✓ means confirmed</b><span>Read-back before ✓</span></div>
       <div class="rule"><b>Undo is a real write</b><span>30 min · gated · read back</span></div>
       <div class="rule"><b>Order writes safely</b><span>Allow first, then restrict</span></div>
-      <div class="rule"><b>Dates aren't a model's job</b><span>Pure parser · unsure → nothing</span></div>
+      <div class="rule"><b>The LLM only writes words</b><span>Never decides · never extracts values</span></div>
       <div class="rule"><b>Values are checked</b><span>In range or known set only</span></div>
-      <div class="rule"><b>The demo never dies</b><span>Rules answer if models fail</span></div>
+      <div class="rule"><b>Jev down says so</b><span>“Can’t understand” + screen link · no second decider</span></div>
       <div class="rule"><b>Charts don't shout zeros</b><span>No $0 labels · partial = hatched</span></div>
     </div>
   </main>
   <footer class="foot">Simulated end to end in your browser · fictional data · illustrative latencies</footer>
-  <script src="js/flowgraph.js?v=81"></script>
-  <script src="js/arch-init.js?v=81"></script>
+  <script src="js/flowgraph.js?v=93"></script>
+  <script src="js/data.js?v=93"></script>
+  <script src="js/icons.js?v=93"></script>
+  <script src="js/jev.js?v=93"></script>
+  <script src="js/jev-explainer.js?v=93"></script>
+  <script src="js/arch-init.js?v=93"></script>
 </body>
 </html>

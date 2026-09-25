@@ -28,7 +28,7 @@
     VIEW_REWARDS:      { label: 'See your rewards', screen: 'Rewards', icon: 'gift' },
   };
 
-  const T = { act: 0.60, highStakes: 0.70, handoff: 0.50, candidateFloor: 0.35, margin: 0.15 };
+  const T = { act: 0.50, highStakes: 0.70, handoff: 0.50, candidateFloor: 0.25, margin: 0.10 };   // the real adapter's constants
 
   const words = list => new RegExp('\\b(' + list.map(s => s.toLowerCase()).join('|') + ')\\b');
   const MERCH = words([...D.merchants, ...D.merchants.map(m => m.split(' ')[0])]), COUNTRY = words(D.countries);

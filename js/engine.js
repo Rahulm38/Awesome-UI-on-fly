@@ -7,7 +7,7 @@
 (function () {
   const D = window.NovaData, { KINDS, HANDOFFS } = window.Jev;
 
-  const bus = { h: {}, on(e, f) { (this.h[e] = this.h[e] || []).push(f); }, emit(e, d) { (this.h[e] || []).forEach(f => f(d)); } };
+  const bus = { h: {}, on(e, f) { (this.h[e] = this.h[e] || []).push(f); }, off(e, f) { this.h[e] = (this.h[e] || []).filter(x => x !== f); }, emit(e, d) { (this.h[e] || []).forEach(f => f(d)); } };
   const settings = { outage: false, jev: true, llm: true };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -133,12 +133,12 @@
 
   async function execute(trace, item) {
     const ids = item.res.cards.map(c => c.id), p = item.params;
-    const write = op => span(trace, 'bank', `Bank · ${op}`, { op, cards: ids, params: pub(p) }, () => Bank.write(op, ids, p), [110, 240], { from: 'safety' });
+    const write = op => span(trace, 'bank', `Bank · ${op} · timing simulated`, { op, cards: ids, params: pub(p) }, () => Bank.write(op, ids, p), [110, 240], { from: 'safety' });
     if (item.kind === 'SET_INTERNATIONAL') {
       log('international: allow the country FIRST, then restrict — the reverse order could strand a card at home if step 2 failed');
       await write('ALLOW_COUNTRY'); await write('RESTRICT_TO_ALLOW_LIST');
     } else await write(item.kind);
-    const snap = await span(trace, 'bank', 'Bank · read-back', { cards: ids }, () => Bank.read(ids), [60, 140], { from: 'safety' });
+    const snap = await span(trace, 'bank', 'Bank · read-back · timing simulated', { cards: ids }, () => Bank.read(ids), [60, 140], { from: 'safety' });
     if (!Bank.verify(item.kind, snap, p)) { log('read-back did not confirm the write → shown as failed, never ✓', 'warn'); return { t: 'failed', item, reason: 'The bank didn’t confirm the change, so it isn’t shown as done.' }; }
     log(`read-back confirms ${item.kind} on ${ids.length} card(s) → ✓`, 'ok');
     const out = { t: 'done', item };
@@ -178,7 +178,7 @@
   function loadSnapshot(trace, why) {
     if (SNAP.inflight) { log('snapshot: joined the read already in flight — no second bank call', 'dim'); return SNAP.inflight; }
     const t = trace || newTrace('background', why);
-    SNAP.inflight = span(t, 'bank', 'Bank · read 6 months', { window: '6 months', why }, () => ({ transactions: D.txns.length }), [140, 240], { from: 'insight' })
+    SNAP.inflight = span(t, 'bank', 'Bank · read 6 months', { window: '6 months', why }, () => ({ transactions: D.txns.length }), [60, 75], { from: 'insight' })
       .then(r => { SNAP.at = Date.now(); SNAP.inflight = null; log(`snapshot loaded: ${r.transactions} transactions, 1 bank read (${why})`, 'ok'); return r; });
     return SNAP.inflight;
   }
@@ -191,43 +191,49 @@
   const SPENDY = /\b(spend|spent|spending|how much|money|merch\w*|merhc\w*|where did|breakdown|subscriptions?|recurring|unusual|strange|suspicious|limit left|left to spend|how often|which days?|weekday|weekend|compare|vs|versus|top|biggest|trend|per (week|month)|changed|usual|normal|a lot|on track|pace|by card|declined?|declines|rejected|calendar|break down)\b/i;
   const chartCache = new Map(); // text|card → { panel, at }, kept 60 s so the sent answer reuses the typed numbers
   async function insight(trace, text, ctx, typing) {
-    return span(trace, 'insight', typing ? 'Insights · preview' : 'Insights · build', { text, scope: ctxOf(ctx) }, () => null, [1, 3]).then(async () => {
+    if (!settings.jev || settings.outage) return { panel: null, reason: 'Jev unavailable → no chart' };
+    return Promise.resolve().then(async () => {
       if (!SPENDY.test(text)) return { panel: null, reason: 'not a spending question' };
       const key = text.trim().toLowerCase() + '|' + (ctx.cardId || '*'), hit = chartCache.get(key);
       if (!typing && hit && Date.now() - hit.at < 60e3) { log(`chart reused from the typing cache (${Math.round((Date.now() - hit.at) / 1000)} s old) — same numbers you saw while typing`, 'ok'); return { panel: hit.panel, cache: 'typing-cache', ms: 'typed' }; }
-      const snap = await snapshot(trace);
+      const [snap, read] = await Promise.all([snapshot(trace),
+        span(trace, 'insight', `Jev · which chart? · ${typing ? 'keystroke' : 'turn'}`, { text, ask: 'subjects · period · split · by' }, () => Insights.read(text), jevLat())]);
       const t0 = performance.now();
-      const panel = await span(trace, 'insight', 'Insights · choose + draw', { read: Insights.read(text), snapshot: snap.cache }, () => { const ps = Insights.buildAll(text, ctx); Object.defineProperty(ps[0], 'pages', { value: ps, enumerable: false }); return ps[0]; }, [3, 11]);
+      const panel = await span(trace, 'insight', 'Insights · code draws the chart', { read, snapshot: snap.cache }, () => { const ps = Insights.buildAll(text, ctx); Object.defineProperty(ps[0], 'pages', { value: ps, enumerable: false }); return ps[0]; }, [3, 11]);
       chartCache.set(key, { panel, at: Date.now() });
       return { panel, cache: snap.cache, ms: Math.round(performance.now() - t0) };
     });
   }
 
+  // Jev answers in one batched call: the action AND its values (amount, merchant, dates, card).
+  // Measured warm: p50 ≈ 450 ms, p95 ≈ 0.6–1.1 s; the first call of a session also opens the connection.
+  let jevWarm = false;
+  function jevLat() {
+    const cold = !jevWarm; jevWarm = true;
+    return cold ? [650, 800] : Math.random() < 0.08 ? [880, 1150] : [390, 560];
+  }
   async function decideAll(trace, parts, text, ctx) {
-    const { jev, llm, outage } = settings;
+    const { jev, outage } = settings;
     const tag = trace.replay ? 'recorded' : 'live';
     const insightP = parts.length === 1 ? insight(trace, text, ctx) : Promise.resolve({ panel: null });
-    const tasks = [];
-    if (jev) tasks.push(span(trace, 'jev', `Jev · ${tag} · ${parts.length} part${parts.length > 1 ? 's' : ''}`, { source: trace.replay ? 'recorded fixture' : 'live call', parts, catalogue: Object.keys(KINDS).length + ' actions + ' + Object.keys(HANDOFFS).length + ' handoffs' },
-      () => parts.map(p => Jev.decide(p)), [30, 80], { fail: outage && 'no answer within 700 ms' }));
-    else tasks.push(Promise.resolve(null));
-    if (llm) tasks.push(span(trace, 'llm', `LLM · ${tag} · ${jev ? 'slots' : 'decide + slots'}`, { source: trace.replay ? 'recorded fixture' : 'live call', parts, want: jev ? ['amount', 'merchant', 'country', 'dates', 'card'] : ['action', 'amount', 'merchant', 'country', 'dates', 'card'] },
-      () => ({ slots: parts.map(p => Slots.extract(p)), decisions: jev ? null : parts.map(p => ({ ...Jev.decide(p, { strict: true }), source: 'llm' })) }), jev ? [420, 880] : [780, 1400], { fail: outage && 'no answer within 1200 ms' }));
-    else tasks.push(Promise.resolve(null));
-    const [j, l, ins] = await Promise.allSettled([...tasks, insightP]);
-    const insightRes = ins.status === 'fulfilled' ? ins.value : { panel: null };
-    const J = j.status === 'fulfilled' && j.value, L = l.status === 'fulfilled' && l.value;
-    if (!jev && L) log('Jev is off → the LLM decides the action as well: slower, uncalibrated, and no “did you mean” list', 'warn');
-    if (!llm && J) log('LLM is off → open values come from rules (regex): fine for amounts and names, blunt for anything else', 'warn');
-    if (J && L) return { decisions: J, slots: L.slots, insight: insightRes };
-    if (!jev && L) return { decisions: L.decisions, slots: L.slots, insight: insightRes };
-    if (J && !llm) {
-      const slots = await span(trace, 'rules', 'Rules · extract slots', { parts }, () => parts.map(p => Slots.extract(p)), [4, 12]);
-      return { decisions: J, slots, insight: insightRes };
+    const req = { source: trace.replay ? 'recorded fixture' : 'live call', parts, questions: '≈ 44 per part, one batch', catalogue: Object.keys(KINDS).length + ' actions + ' + Object.keys(HANDOFFS).length + ' screens' };
+    try {
+      if (!jev) await span(trace, 'jev', 'Jev · unavailable', req, null, [20, 40], { fail: 'no connection' });
+      if (outage) {
+        try { await span(trace, 'jev', `Jev · ${tag} · attempt 1`, req, null, [4950, 5050], { fail: 'timeout · 5.0 s' }); }
+        catch (e) { log('Jev: attempt 1 timed out after 5.0 s → one retry after 0.25 s (2.0 s kept in reserve)', 'warn'); await sleep(250); }
+        await span(trace, 'jev', `Jev · ${tag} · retry`, req, null, [1700, 1750], { fail: 'timeout · 7.0 s budget spent' });
+      }
+      const [j, ins] = await Promise.all([
+        span(trace, 'jev', `Jev · ${tag} · decide + values`, req, () => ({ decisions: parts.map(p => Jev.decide(p)), slots: parts.map(p => Slots.extract(p)) }), jevLat()),
+        insightP]);
+      return { ...j, insight: ins };
+    } catch (e) {
+      // There is no second decider: say so plainly and link to the screen that can do it.
+      log('Jev unavailable → no fallback decider: the phone says so and links to the screen that can do it', 'warn');
+      await span(trace, 'rules', 'Fallback · link to the right screen', { reason: e.message }, () => ({ reply: 'outage', link: 'Card settings' }), [3, 8]);
+      return { outage: true };
     }
-    log(!jev && !llm ? 'Jev and the LLM are both off → rules decider (slower, blunter; the demo never dies)' : 'models unavailable → rules decider (slower, blunter; the demo never dies)', 'warn');
-    const r = await span(trace, 'rules', 'Rules · decide', { parts }, () => ({ decisions: parts.map(p => Jev.decide(p, { strict: true })), slots: parts.map(p => Slots.extract(p)) }), [350, 600]);
-    return { ...r, insight: insightRes };
   }
 
   // ── rate limit: a token bucket per visitor, the way a real gateway would ──
@@ -268,7 +274,7 @@
       return [await advance(trace, head, ctx)];
     }
     if (head && head.waiting.need === 'slot') {
-      const s = await span(trace, 'llm', 'LLM · fill waiting value', { text: turn.text, want: head.waiting.slot }, () => Slots.extract(turn.text), [380, 700]);
+      const s = await span(trace, 'jev', 'Jev · read the waiting value', { text: turn.text, want: head.waiting.slot }, () => Slots.extract(turn.text), jevLat());
       const v = sanitize(head.kind, s)[head.waiting.slot];
       if (v != null) {
         head.params[head.waiting.slot] = v; if (head.kind === 'RAISE_DISPUTE') head.params.txn = sanitize(head.kind, s).txn;
@@ -281,7 +287,9 @@
 
     const parts = splitParts(turn.text);
     if (parts.length > 1) log(`split into ${parts.length} parts — each gets its own row, in the order asked`);
-    const { decisions, slots, insight: ins } = await decideAll(trace, parts, turn.text, ctx);
+    const decided = await decideAll(trace, parts, turn.text, ctx);
+    if (decided.outage) { bus.emit('scores', { outage: true }); return [{ t: 'outage' }]; }
+    const { decisions, slots, insight: ins } = decided;
     bus.emit('scores', { decisions, parts });
 
     const items = await span(trace, 'safety', 'Safety gate', { proposals: decisions.map((d, i) => ({ verdict: d.verdict, choice: d.top && d.top.id, p: d.top && d.top.p, slots: slots[i] })) }, () => {
@@ -312,6 +320,17 @@
         results.push(r);
       } else results.push({ t: v.toLowerCase(), item: it, d: it.d });
     }
+    // The LLM only ever writes words: an answer's headline, then Jev checks it. Never decides, never on writes.
+    const answer = results.find(r => r.t === 'insight');
+    if (answer) {
+      if (!settings.llm) log('LLM off → the templated headline is used; nothing else changes', 'dim');
+      else {
+        try {
+          const head = await span(trace, 'llm', 'LLM · word the headline', { facts: answer.panel.takeaway, rule: 'numbers only as {fN} placeholders' }, () => ({ headline: answer.panel.takeaway }), [600, 900], { fail: settings.outage && 'no words within 1.5 s' });
+          await span(trace, 'jev', 'Jev · check the wording', { headline: head.headline }, () => ({ keep: true }), jevLat());
+        } catch (e) { log('LLM: no words within the 1.5 s cap → templated headline, the answer is not held up', 'warn'); }
+      }
+    }
     return results;
   }
 
@@ -330,22 +349,22 @@
     delete undoable[actionId];
     const { item } = rec, op = KINDS[item.kind].undo, ids = item.res.cards.map(c => c.id);
     await span(trace, 'safety', 'Safety gate · undo', { actionId, reverse: op }, () => ({ allowed: true }), [1, 3]);
-    await span(trace, 'bank', `Bank · ${op}`, { op, cards: ids }, () => Bank.write(op, ids, item.params), [110, 220], { from: 'safety' });
-    const snap = await span(trace, 'bank', 'Bank · read-back', { cards: ids }, () => Bank.read(ids), [60, 130], { from: 'safety' });
+    await span(trace, 'bank', `Bank · ${op} · timing simulated`, { op, cards: ids }, () => Bank.write(op, ids, item.params), [110, 220], { from: 'safety' });
+    const snap = await span(trace, 'bank', 'Bank · read-back · timing simulated', { cards: ids }, () => Bank.read(ids), [60, 130], { from: 'safety' });
     return Bank.verify(op, snap, item.params) ? [{ t: 'undone', item }] : [{ t: 'failed', item, reason: 'The bank didn’t confirm the undo.' }];
   }
 
-  // ── public: a keystroke (only Jev answers; no LLM, no rules, no writes) ──
+  // ── public: a keystroke (only Jev answers: one call for the tray, one for the chart; no LLM, no writes) ──
   async function intent(text, ctx, replay) {
     const trace = newTrace('typing', text, replay);
     if (!settings.jev) return { outage: true, off: true };
     if (!replay && !LIMITS.keystroke.take()) { log('keystroke rate limit (90 / min) → skipped, no tray', 'dim'); return { outage: true, off: true, limited: true }; }
     if (settings.outage) {
-      try { await span(trace, 'jev', 'Jev · score keystroke', { text }, null, [600, 700], { fail: 'no answer within 700 ms' }); } catch (e) { /* expected */ }
+      try { await span(trace, 'jev', 'Jev · keystroke', { text }, null, [2450, 2550], { fail: 'no answer within 2.5 s → tray stays empty' }); } catch (e) { /* expected */ }
       return { outage: true };
     }
     const [d, ins] = await Promise.all([
-      span(trace, 'jev', `Jev · ${replay ? 'recorded' : 'live'} · keystroke`, { source: replay ? 'recorded fixture' : 'live call', text, context: ctxOf(ctx) }, () => Jev.decide(text), [25, 240]),
+      span(trace, 'jev', `Jev · ${replay ? 'recorded' : 'live'} · keystroke`, { source: replay ? 'recorded fixture' : 'live call', text, context: ctxOf(ctx) }, () => Jev.decide(text), jevLat()),
       insight(trace, text, ctx, true),
     ]);
     const pres = present(d, text, ctx);
@@ -454,6 +473,7 @@
           const f = FOLLOW[r.panel.visual]; if (f) out.push({ type: 'FOLLOW', chips: f.map(l => ({ label: l, turn: { text: l } })) });
           break;
         }
+        case 'outage': out.push({ type: 'ANSWER', text: 'I can’t understand requests right now. You can still do it yourself:' }); out.push({ type: 'CTA', label: 'Open card settings', screen: 'Card settings' }); break;
         case 'handoff': { const h = HANDOFFS[r.d.top.id];
           out.push({ type: 'ANSWER', text: `I can’t do that here, but **${h.screen}** can.` });
           out.push({ type: 'CTA', label: h.label, screen: h.screen }); break; }
@@ -470,5 +490,5 @@
 
   const resetState = () => { NovaData.reset(); queue.length = 0; for (const k in undoable) delete undoable[k]; chartCache.clear(); log('state reset → a clean run (cards back to their starting state)', 'dim'); };
   window.Engine = { bus, settings, message, intent, log, resetState, splitParts,
-    preview: async (text, ctx) => { if (!SPENDY.test(text)) return null; const t = newTrace('typing', text, false, true); log('keystroke → Insights only · Jev isn’t called in “On send” mode', 'dim'); return (await insight(t, text, ctx, true)).panel; }, prewarm: () => loadSnapshot(null, 'sheet opened → prewarm') };
+    preview: async (text, ctx) => { if (!SPENDY.test(text)) return null; const t = newTrace('typing', text, false, true); log('keystroke → one Jev call reads which chart; the action waits for send (On send)', 'dim'); return (await insight(t, text, ctx, true)).panel; }, prewarm: () => loadSnapshot(null, 'sheet opened → prewarm') };
 })();

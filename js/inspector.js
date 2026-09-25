@@ -12,7 +12,7 @@
   const ROUTES = {
     'phone-orch': ['phone-orch'],
     'orch-jev': ['orch-group', 'in-jev'], 'orch-llm': ['orch-group', 'in-llm'], 'orch-insight': ['orch-group', 'in-insight'], 'orch-rules': ['orch-group', 'in-rules'],
-    'orch-safety': () => [(Engine.settings.jev ? 'out-jev' : Engine.settings.llm ? 'out-llm' : 'out-rules'), 'group-safety'],
+    'orch-safety': () => ['out-jev', 'group-safety'],
     'safety-bank': ['safety-bank'], 'orch-composer': ['bank-composer'], 'composer-phone': ['composer-render'],
   };
 
@@ -51,7 +51,7 @@
     const n = NODES[id];
     cls(id); n.sub.textContent = subFor(id);
     document.querySelectorAll(`[data-model="${id}"]`).forEach(x => (x.checked = on));
-    Engine.log(`simulation: ${n.t} ${on ? 'back up' : 'down'}${on ? '' : id === 'jev' ? ' → the LLM decides actions, the typing tray goes quiet' : ' → rules extract values'}`, on ? 'ok' : 'warn');
+    Engine.log(`simulation: ${n.t} ${on ? 'back up' : 'down'}${on ? '' : id === 'jev' ? ' → nothing decides: the phone says so and links to the screen · the typing tray goes quiet' : ' → templated wording; decisions are unchanged'}`, on ? 'ok' : 'warn');
   }
   document.querySelectorAll('[data-model]').forEach(x => x.onchange = () => setModel(x.dataset.model, x.checked));
 
@@ -79,7 +79,7 @@
     recording = [];
     trace = t; spans = [];
     settleLive(t.kind === 'typing' ? 1500 : 0);
-    $('#live').className = 'live on'; $('#live').lastChild.textContent = t.previewOnly ? 'keystroke · insights only · Jev not called' : (t.replay ? 'recorded' : 'live') + (t.kind === 'typing' ? ' · keystroke' : ' · turn');
+    $('#live').className = 'live on'; $('#live').lastChild.textContent = t.previewOnly ? 'keystroke · chart only · action waits for send' : (t.replay ? 'recorded' : 'live') + (t.kind === 'typing' ? ' · keystroke' : ' · turn');
     if (t.previewOnly) setTimeout(() => say('preview'), 30);
     for (const [id, n] of Object.entries(NODES)) { cls(id, id === 'phone' ? 'done' : 'idle'); n.ms.textContent = ''; n.sub.textContent = subFor(id); }
     $('#trace-label').textContent = `${t.kind === 'typing' ? 'keystroke' : 'turn'} · “${t.label.slice(0, 48)}”`;
@@ -114,7 +114,7 @@
     const by = id => spans.filter(s => s.node === id).reduce((a, s) => a + s.dur, 0);
     const ins = spans.find(s => s.node === 'insight' && s.req && s.req.snapshot);
     const items = [['Total', `${Math.round(end)} ms`, 'tot']];
-    [['Jev', 'jev'], ['LLM', 'llm'], ['Rules', 'rules'], ['Insights', 'insight'], ['Gate', 'safety'], ['Bank', 'bank']].forEach(([l, id]) => { const v = by(id); if (v) items.push([l, `${Math.round(v)} ms`]); });
+    [['Jev', 'jev'], ['LLM', 'llm'], ['Insights', 'insight'], ['Gate', 'safety'], ['Bank', 'bank']].forEach(([l, id]) => { const v = by(id); if (v) items.push([l, `${Math.round(v)} ms`]); });
     if (ins) items.push(['Snapshot', ins.req.snapshot]);
     $('#summary').innerHTML = items.map(([l, v, c]) => `<span class="${c || ''}">${l}<b>${esc(v)}</b></span>`).join('');
   }
@@ -166,7 +166,8 @@
   const T = window.Jev.T;
   const PATTERN = { A: 'A · card → done', B: 'B · card → value chips', C: 'C · card → merchant', D: 'D · hand off to a screen', E: 'E · full confirm', F: 'F · navigate only', G: 'G · multi-step plan', H: 'H · nothing', R: 'Read · chart' };
   let decisions = [], part = 0, pres = null, lastPanel = null;
-  bus.on('scores', ({ decisions: ds, parts }) => { decisions = ds.map((d, i) => ({ d, text: parts[i] })); part = 0; pres = lastPanel && trace && lastPanel.trace === trace.id ? { panel: lastPanel.panel } : null; drawScores(); });
+  bus.on('scores', ({ decisions: ds, parts, outage }) => {
+    if (outage) { $('#scores').innerHTML = '<p class="hud-empty">jev unavailable · no decision was made · the phone links to the screen that can do it<i>_</i></p>'; $('#scores-text').textContent = ''; return; } decisions = ds.map((d, i) => ({ d, text: parts[i] })); part = 0; pres = lastPanel && trace && lastPanel.trace === trace.id ? { panel: lastPanel.panel } : null; drawScores(); });
   bus.on('span', s => { if (s.node === 'insight' && s.res && s.res.visual && trace && s.trace === trace.id && trace.kind === 'turn') { lastPanel = { trace: s.trace, panel: s.res }; pres = Object.assign(pres || {}, { panel: s.res }); drawScores(); } });
   Engine.showDecision = (d, text, p) => { decisions = [{ d, text }]; part = 0; pres = p || null; drawScores(); };
 
@@ -195,8 +196,7 @@
     else if (pres && pres.type === 'HANDOFF') told = chip('ui', 'handoff') + chip('screen', pres.screen);
     if (pres && pres.panel) told += chip('chart', pres.panel.visual) + chip('read', `${pres.panel.read.intent} · ${pres.panel.read.period}`) + (pres.panel.ladder || []).map(l => chip('fell back', l.split(':')[0], 'warn')).join('');
     // ── the Jev call itself: endpoint, latency, request → response, and how the choice was made
-    const js = spans.filter(x => x.node === 'jev' || x.node === 'rules').pop();
-    const src = d.source === 'rules' ? 'rules' : d.source === 'llm' ? 'llm' : 'jev';
+    const js = spans.filter(x => x.node === 'jev').pop();
     const ranked = d.scores.filter(x => !top || x.id !== top.id);
     const best = top || d.scores.find(x => x.type === 'kind'), runner = ranked[0];
     const lead = best && runner ? +(best.p - runner.p).toFixed(2) : null;
@@ -204,30 +204,27 @@
     const ok = (c, text) => `<li class="${c ? 'y' : 'n'}" style="animation-delay:${(si++) * 160}ms"><i>${Icon(c ? 'check' : 'x', 12)}</i>${text}</li>`;
     const steps = [
       ok(d.route.IN_SCOPE >= d.route.OUT_OF_SCOPE, `route · in ${d.route.IN_SCOPE.toFixed(2)} ${d.route.IN_SCOPE >= d.route.OUT_OF_SCOPE ? '≥' : '<'} out ${d.route.OUT_OF_SCOPE.toFixed(2)}`),
-      best ? ok(best.p >= barOf(best), `${best.id} ${best.p.toFixed(2)} ${best.p >= barOf(best) ? '≥' : '<'} bar ${barOf(best).toFixed(2)}${best.highStakes ? ' (high stakes)' : ''}`) : '',
-      best && lead != null ? ok(lead >= T.margin || !(runner.p >= T.candidateFloor), `lead ${lead.toFixed(2)} over ${runner.id} ${lead >= T.margin || runner.p < T.candidateFloor ? '≥' : '<'} margin ${T.margin}`) : '',
-      d.verdict === 'CANDIDATES' ? ok(true, `${d.candidates.length} readings ≥ floor ${T.candidateFloor} → offer choices`) : '',
+      best ? ok(best.p >= barOf(best), `${best.type === 'kind' ? 'act_' + best.id.toLowerCase() : 'handoff_screen ' + best.id} ${best.p.toFixed(2)} ${best.p >= barOf(best) ? '≥' : '<'} ${barOf(best).toFixed(2)}${best.highStakes ? ' (high stakes)' : ''}`) : '',
+      best && lead != null ? ok(lead >= T.margin || !(runner.p >= T.candidateFloor), `lead ${lead.toFixed(2)} over ${runner.id} ${lead >= T.margin || runner.p < T.candidateFloor ? '≥' : '<'} tie margin ${T.margin} (else route breaks it)`) : '',
+      d.verdict === 'CANDIDATES' ? ok(true, `${d.candidates.length} readings ≥ floor ${T.candidateFloor} (2–3 shown) → did you mean`) : '',
       d.verdict === 'AMBIGUOUS' ? ok(false, 'ambiguous word · no direction/locate') : '',
     ].join('');
+    // The real call's shape: one POST of { model, state, questions } → { answers } keyed by question id.
+    const nouls = d.scores.filter(x => x.type === 'kind').slice(0, 3);
+    const qid = id => 'act_' + id.toLowerCase();
+    const cards = NovaData.cards.filter(c => !c.archived);
+    const req = { model: 'jev-1.13.0', state: { query: cur.text, screen: pres && pres.cardSource === 'SCREEN' ? 'CARD_DETAIL' : 'HOME', cards: `${cards.length} × {cardId, displayName, last4, isFreezed}`, locale: 'en-US' },
+      questions: `route (choice) · one act_* per action (noul) · card_any (choice) · merchant · out_of_scope · handoff_screen … ≈ ${trace && trace.kind === 'typing' ? 36 : 85}` };
+    const res = { route: { type: 'choice', choice: top ? top.id : d.verdict === 'HANDOFF' ? 'OUT_OF_SCOPE' : 'NONE', probabilities: `IN ${d.route.IN_SCOPE.toFixed(2)} · OUT ${d.route.OUT_OF_SCOPE.toFixed(2)}` } };
+    nouls.forEach(x => (res[qid(x.id)] = { type: 'noul', noul: +x.p.toFixed(2) }));
     const choice = top ? top.id : null;
-    const req = { text: cur.text, context: pres && pres.cardSource ? { cardSource: pres.cardSource } : { screen: 'HOME' }, catalogue: `${Object.keys(Jev.KINDS).length} actions + ${Object.keys(Jev.HANDOFFS).length} screens`, mode: trace && trace.kind === 'typing' ? 'keystroke' : 'turn', source: trace && trace.replay ? 'recorded fixture' : 'live call' };
-    const res = { choice, verdict: d.verdict, top3: d.scores.slice(0, 3).map(x => `${x.id} ${x.p.toFixed(2)}`), candidates: d.candidates.map(x => x.id) };
     const call = `<div class="call">
-      <div class="call-h"><span class="verb">POST</span><span>/v1/${src === 'jev' ? 'jev/decide' : src === 'llm' ? 'llm/decide' : 'rules/decide'}</span><span class="mode ${trace && trace.replay ? 'rec' : 'live'}">${trace && trace.replay ? 'RECORDED' : 'LIVE'}</span>
+      <div class="call-h"><span class="verb">POST</span><span>/v1/jev/decide</span><span class="mode ${trace && trace.replay ? 'rec' : 'live'}">${trace && trace.replay ? 'RECORDED' : 'LIVE'}</span>
         <span class="st ${js && js.status !== 'ok' ? 'bad' : ''}">${js ? (js.status === 'ok' ? '200' : '504') : '200'}</span><span class="lat">${js ? Math.round(js.dur) + ' ms' : '—'}</span></div>
       <div class="call-b"><div><small>request</small><pre>${esc(compact(req))}</pre></div><div><small>response</small><pre>${esc(compact(res))}</pre></div></div>
       <div class="call-sel"><small>selection</small><ol>${steps}</ol><div class="choice-line" style="animation-delay:${si * 160 + 80}ms">choice → <b class="${choice ? '' : 'null'}">${choice || 'null'}</b>${choice ? '' : ` <em>· ${d.verdict.toLowerCase()}</em>`}</div></div>
     </div>`;
-    // When Jev isn't the one deciding, show how the fallback pattern-matcher got there.
-    let body = `<div class="srs">${rows}</div>`;
-    if (d.source !== 'jev') {
-      const byChoice = {};
-      (d.features || []).forEach(f => { const m = /^(\S+) ([+-][\d.]+) ← (.*)$/.exec(f); if (!m) return; (byChoice[m[1]] = byChoice[m[1]] || { sum: 0, hits: [] }); byChoice[m[1]].sum += +m[2]; byChoice[m[1]].hits.push(`${m[3]} ${m[2]}`); });
-      const list = Object.entries(byChoice).sort((a, b) => b[1].sum - a[1].sum);
-      body = `<div class="rules-view"><div class="rv-h">${d.source === 'llm' ? 'LLM decided (Jev off) · simulated with the same patterns' : 'Rules classifier · deterministic pattern match'}</div>
-        ${list.length ? list.map(([id, v]) => `<div class="rv-row${top && top.id === id ? ' win' : ''}"><b>${esc(id)}</b><span>${v.hits.map(esc).join(' · ')}</span><em>Σ ${v.sum.toFixed(1)}</em></div>`).join('') : '<div class="rv-row"><span>no pattern matched</span></div>'}
-        <div class="rv-note">exact words only · no probabilities · no “did you mean” · no typing tray — why Jev exists</div></div>`;
-    }
+    const body = `<div class="srs">${rows}</div>`;
     box.innerHTML = head + body + call + (told ? `<div class="told-row"><small>phone told</small>${told}</div>` : '');
     $('#scores-text').textContent = `“${cur.text.slice(0, 60)}”`;
   }

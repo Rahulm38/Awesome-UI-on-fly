@@ -25,7 +25,7 @@ open index.html
 
 The phone is a spending screen with the assistant sheet open over it. Scenario buttons type a message into the phone for you; the right side shows the system flow, Jev's scores, per-hop latency, every payload and a decision log.
 
-**Charts on the fly.** A spending question is read into closed lists (intent, subjects, period, split). A pure chooser then picks the chart from the *shape of the data*, falling back down a ladder when the data doesn't fit:
+**Charts on the fly.** Jev reads which chart a spending question asks for (intent, subjects, period, split). Deterministic code then builds it from the *shape of the data* in < 15 ms, falling back down a ladder when the data doesn't fit:
 
 | Question | Chart |
 |---|---|
@@ -61,9 +61,11 @@ The phone is a spending screen with the assistant sheet open over it. Scenario b
 
 **While typing.** Spending questions show a live chart preview above the input as you type, in either mode. Switch *Call Jev* (under the phone) to **Every keystroke** and Jev scores each keystroke too: an action row, a *did you mean* list or a handoff appears before you press send.
 
-**Simulate models down.** (Simulation only — no real model is ever called.) In the system flow, turn **Jev** or the **LLM** off (the switches in the system-flow header, or click the node). Jev off: the LLM decides actions too — slower, uncalibrated, no *did you mean*, no typing tray. LLM off: rules extract the values. Both off: the rules decider answers.
+**Simulate models down.** (Simulation only — no real model is ever called.) In the system flow, turn **Jev** or the **LLM** off (the switches in the system-flow header, or click the node).
+- Jev off: no second decider · the phone says *I can't understand requests right now* + a button to the screen that can · no typing tray
+- LLM off: nothing is decided differently · answers use templated wording
 
-**Simulate outage.** In the same place as the Jev/LLM switches — toggle it: Jev and the LLM time out, the rules decider answers turns, and the typing tray goes quiet.
+**Simulate outage.** In the same place as the Jev/LLM switches — toggle it: Jev and the LLM time out, turns get the screen link, and the typing tray goes quiet.
 
 ## Safeguards
 
@@ -78,12 +80,17 @@ The phone is a spending screen with the assistant sheet open over it. Scenario b
 
 | Technique | What it buys |
 |---|---|
-| Jev ∥ LLM ∥ Insights | the three calls run in parallel; a turn costs the slowest, not the sum |
-| Warm snapshot | six months of transactions loaded when the sheet opens; fresh for 120 s |
+| One Jev call per turn | action + all values in one batched call (~44 questions answered in parallel server-side) · p50 ≈ 450 ms, p95 ≈ 0.6–1.1 s |
+| Pre-warmed connection | first call of a session ≈ 0.7 s; opened when the sheet opens |
+| Chart call beside the turn | Jev picks the chart in parallel with the turn; code builds it in < 15 ms |
+| LLM only when needed | words an answer's headline (≤ 1.5 s, typical 0.6–0.9 s) · never on keystrokes or bank writes · fails → templated wording |
+| Timeouts | turn 7.0 s = 5.0 s + one retry after 0.25 s · tray 2.5 s, no retry · chart 4.0 s |
+| Warm snapshot | six months of transactions loaded when the sheet opens (cold ≈ 65 ms); fresh for 120 s |
 | Stale-while-revalidate | a snapshot up to 30 min old is served instantly while one background refresh runs |
 | Single flight | concurrent readers share one bank read |
-| Typing cache | a chart built while typing is kept 60 s, so pressing send reuses the same numbers |
-| Typing controls | ≥ 3 characters, 120 ms debounce, ≤ 2 requests in flight, newest-wins with a text check |
+| Typing cache | a chart pick made while typing is kept 60 s, so pressing send reuses it |
+| Typing controls | Jev only: tray + chart calls side by side · first at the 3rd character, at once at each word end or backspace, else after 180 ms of quiet · ≤ 3 tray / 2 chart calls in flight · used only if its text is still in the box and it's newer than the last one shown |
+| End to end | tray ≈ 0.6 s after the 3rd character · a sent turn ~1.5–3.5 s |
 | No flicker | a different chart swaps in only at a word boundary or after 600 ms of quiet |
 
 ## How it's put together
@@ -96,8 +103,8 @@ architecture.html the design, as a page
 site.css  phone.css
 js/
   data.js       fictional cards, merchants (with monogram logos) and 6 months of transactions
-  jev.js        Jev: the decision model (closed catalogue → scores → verdict)
-  llm.js        the LLM (open values) and a pure date parser
+  jev.js        Jev: the decision model (closed catalogue → scores → verdict + values)
+  llm.js        the values Jev returns (amounts, merchants, dates), simulated
   insights.js   question → closed lists → chart chooser → panel (pure)
   charts.js     draws a panel; never formats money or picks colours
   engine.js     orchestrator, safety gate, simulated bank, UI composer
@@ -109,7 +116,7 @@ docs/
 
 ## What is real and what is simulated
 
-Everything runs in your browser. Merchants are fictional. The models are **simulated**: Jev is a weighted-feature scorer that behaves like a calibrated classifier, and the “LLM” is a set of extractors. Latencies are illustrative ranges. Cards and transactions are made up and reset on reload. The **decision flow, thresholds, lanes, and safety rules** are the design being demonstrated.
+Everything runs in your browser. Merchants are fictional. The models are **simulated**: Jev is a weighted-feature scorer that behaves like a calibrated classifier, and the “LLM” only writes answer wording. Latencies are illustrative, modelled on measured numbers; bank timings are simulated. Cards and transactions are made up and reset on reload. The **decision flow, thresholds, lanes, and safety rules** are the design being demonstrated.
 
 ## Contributing
 

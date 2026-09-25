@@ -6,10 +6,10 @@
   const META = {
     phone:    { t: 'CLIENT', s: 'POST /v1/turn', c: '#9ca3af', stage: '01 Request', id: 'EDGE-00' },
     orch:     { t: 'ORCHESTRATOR', s: 'turn router', c: '#38bdf8', stage: '02 Route', id: 'SVC-01' },
-    jev:      { t: 'JEV', s: 'decision model', c: '#c084fc', row: true },
-    llm:      { t: 'LLM', s: 'slot extraction', c: '#f472b6', row: true },
-    insight:  { t: 'INSIGHTS', s: 'snapshot cache', c: '#22d3ee', row: true },
-    rules:    { t: 'RULES', s: 'failover', c: '#facc15', row: true, fallback: true },
+    jev:      { t: 'JEV', s: 'decides · reads values', c: '#c084fc', row: true },
+    llm:      { t: 'LLM', s: 'wording · answers only', c: '#f472b6', row: true },
+    insight:  { t: 'INSIGHTS', s: 'Jev picks · code draws', c: '#22d3ee', row: true },
+    rules:    { t: 'SCREEN LINK', s: 'if Jev is down', c: '#facc15', row: true, fallback: true },
     safety:   { t: 'SAFETY GATE', s: 'deterministic', c: '#4ade80', stage: '04 Guard', id: 'SVC-02' },
     bank:     { t: 'CORE BANKING', s: 'write · read-back', c: '#60a5fa', stage: '05 Execute', id: 'EXT-01' },
     composer: { t: 'UI COMPOSER', s: 'results → blocks', c: '#e879f9', stage: '06 Compose', id: 'SVC-03' },
@@ -19,16 +19,16 @@
   // Plain-language narration of what the request is doing right now.
   const SAY = {
     orch: '02 Route → orchestrator receives the turn and fans out',
-    jev: '03 Decide → Jev scores the closed catalogue of actions',
-    llm: '03 Decide → LLM pulls out amounts, merchants, dates',
-    insight: '03 Decide → Insights read the warm snapshot and pick a chart',
-    rules: '03 Decide → models unavailable · rules decide instead',
+    jev: '03 Decide → Jev picks the action and reads its values · one call ≈ 450 ms',
+    llm: '06 Compose → the LLM words the headline · Jev checks it',
+    insight: '03 Decide → Jev reads which chart · code draws it from the warm snapshot',
+    rules: '03 Decide → Jev unavailable · no second decider: link to the right screen',
     safety: '04 Guard → safety gate: card · eligibility · values · lane',
     bank: '05 Execute → write to core banking, then read it back',
     composer: '06 Compose → results become UI blocks',
     render: '07 Render → the phone draws what it was sent',
     snap: '03 Decide → snapshot refresh · one read from core banking, shared',
-    preview: 'Keystroke → Insights only draws a chart preview · Jev is NOT called (On send)',
+    preview: 'Keystroke → one Jev call reads which chart · the action waits for send',
   };
   const SAMPLE = ['phone-orch', 'orch-group', 'in-jev', 'out-jev', 'group-safety', 'safety-bank', 'bank-composer', 'composer-render'];
   const VERTICAL_BELOW = 640;   // container px: under this the wide drawing's text drops below ~7px
@@ -118,7 +118,7 @@
       const G = L.group;
       mk('rect', { x: G.x, y: G.y, width: G.w, height: G.h, class: 'group' });
       mk('path', { d: brackets(G.x, G.y, G.w, G.h, 10), class: 'group-br' });
-      mk('text', { x: G.x, y: G.y - 8, class: 'stage-t' }).textContent = '03 Decide · fan-out ×3';
+      mk('text', { x: G.x, y: G.y - 8, class: 'stage-t' }).textContent = '03 Decide · Jev in parallel';
       mk('line', { x1: L.div[0], x2: L.div[1], y1: L.div[2], y2: L.div[2], class: 'group-div' });
       for (const [k, d] of Object.entries(L.edges)) {
         const main = !k.startsWith('in-') && !k.startsWith('out-');
@@ -173,8 +173,8 @@
     const reset = () => Object.keys(N).forEach(id => { g.cls(id, id === 'phone' ? 'done' : 'idle'); N[id].ms.textContent = ''; });
     g.showFlows(SAMPLE);
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      reset(); [['orch', '3ms'], ['jev', '46ms'], ['llm', '612ms'], ['insight', '11ms'], ['safety', '4ms'], ['bank', '88ms'], ['composer', '2ms'], ['render', '✓']].forEach(([id, ms]) => done(id, ms));
-      if (sayEl) sayEl.textContent = 'a sample turn · Jev ∥ LLM ∥ Insights, then gate → bank → composer → phone';
+      reset(); [['orch', '4ms'], ['jev', '452ms'], ['insight', '468ms'], ['llm', '740ms'], ['safety', '3ms'], ['bank', '64ms'], ['composer', '2ms'], ['render', '✓']].forEach(([id, ms]) => done(id, ms));
+      if (sayEl) sayEl.textContent = 'a sample chart turn · Jev decides ∥ Jev picks the chart, then gate → composer (LLM words it) → phone';
       return;
     }
     const go = async (keys, id, color) => { for (const k of keys) await g.packet(k, color || N[id].c); g.cls(id, 'active'); say(id); };
@@ -182,15 +182,16 @@
       for (;;) {
         while (document.hidden) await wait(500);
         reset(); await wait(600);
-        await go(['phone-orch'], 'orch'); await wait(250); done('orch', '3ms');
+        await go(['phone-orch'], 'orch'); await wait(250); done('orch', '4ms');
         await g.packet('orch-group', N.orch.c);
-        await Promise.all([go(['in-jev'], 'jev'), go(['in-llm'], 'llm'), go(['in-insight'], 'insight')]);
-        say('jev'); await wait(500); done('jev', '46ms');
-        say('insight'); await wait(400); done('insight', '11ms');
-        say('llm'); await wait(900); done('llm', '612ms');
-        await g.packet('out-jev', N.safety.c); await go(['group-safety'], 'safety'); await wait(500); done('safety', '4ms');
-        await go(['safety-bank'], 'bank'); await wait(800); done('bank', '88ms');
-        await go(['bank-composer'], 'composer'); await wait(500); done('composer', '2ms');
+        await Promise.all([go(['in-jev'], 'jev'), go(['in-insight'], 'insight')]);
+        say('jev'); await wait(900); done('jev', '452ms');
+        say('insight'); await wait(300); done('insight', '468ms');
+        await g.packet('out-jev', N.safety.c); await go(['group-safety'], 'safety'); await wait(400); done('safety', '3ms');
+        await go(['safety-bank'], 'bank'); await wait(500); done('bank', '64ms');
+        await go(['bank-composer'], 'composer'); await wait(300);
+        await go(['in-llm'], 'llm'); say('llm'); await wait(1100); done('llm', '740ms');
+        done('composer', '2ms');
         await go(['composer-render'], 'render'); await wait(300); done('render', '✓');
         await wait(3200);
       }

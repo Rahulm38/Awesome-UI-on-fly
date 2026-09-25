@@ -10,7 +10,7 @@ A model that drives UI and touches money needs rules that don't bend. Each rule 
 
 **A near tie is a question.** A reading wins only if it clears its bar **and** leads every plausible rival by the margin. Otherwise, with two or three plausible readings, the person chooses from a list. With fewer than two, nothing is shown, because a menu of one is a guess. → `jev.js › decide`
 
-**High stakes need a higher bar.** Reporting a card lost and disputing a charge need 0.70, not 0.60. A half-typed “forgot” scores about 0.47 for both *lost card* and *PIN*, so it gets a choice, never an alarming suggestion. → `Jev.T.highStakes`
+**High stakes need a higher bar.** Reporting a card lost and disputing a charge need 0.70, not 0.50. A half-typed “forgot” scores about 0.47 for both *lost card* and *PIN*, so it gets a choice, never an alarming suggestion. → `Jev.T.highStakes`
 
 **Ambiguous words get no tray.** “atm” alone sits between *turn off ATM withdrawals* and *find an ATM*. A direction word (“off”, “block”) or a locate word (“find”, “near”) settles it. Without one, nothing is shown while typing, and pressing send asks. → `rawScores`
 
@@ -28,19 +28,19 @@ A model that drives UI and touches money needs rules that don't bend. Each rule 
 
 **Order writes so a failure is harmless.** For travel, Nova allows the country *first* and restricts the card *second*. The reverse order could leave a card working only at home if the second step failed. → `execute`
 
-**Dates are not a model's job.** “next week” → a calendar range comes from a pure function with no model. When it's unsure it returns nothing rather than guessing a window. → `llm.js › Dates`
+**The LLM only writes words.** Jev decides the action *and* its values (amount, merchant, dates, card) in one call. The LLM never decides and never extracts values. It words an answer's headline (numbers only as placeholders, then Jev checks the wording), follow-ups and advice. Only when needed: never on keystrokes, never on bank writes. Headline wait ≤ 1.5 s; on failure → templated wording.
 
-**Values are checked before they're used.** The LLM may propose an amount, merchant or country. Only values in range, or in a known set, reach the bank. → `sanitize`
+**Values are checked before they're used.** Jev proposes an amount, merchant or country. Only values in range, or in a known set, reach the bank. → `sanitize`
 
-**Slot filling stays in the turn.** The tray only resolves *which action* and *which card*. Missing values are asked for in the chat, in one place. → `interaction`
+**Missing values are asked in the turn.** The tray only resolves *which action* and *which card*. Missing values are asked for in the chat, in one place. → `interaction`
 
-**The demo never dies.** If both models fail, a rules decider answers turns: slower and blunter, but it answers. → `decideAll`
+**Jev down says so.** No second decider. The phone says “I can't understand requests right now” and shows a button to the screen that can do it.
 
 **Charts don't shout zeros.** An empty week gets no `$0` label, and a just-started week is drawn faded. → `phone.js › CHART`
 
 ## Charts
 
-**The data picks the chart, not the words.** The LLM only maps a question onto closed lists. A pure chooser picks the visual from the shape of the numbers and falls back down a ladder — a donut needs a clear leader, a split bar needs more than one card, a pace line needs five days of the month. The stat tile is the floor. → `insights.js › choose`
+**The data picks the chart, not the words.** Jev reads which chart the question asks for, from closed lists. Deterministic code picks the visual from the shape of the numbers and falls back down a ladder — a donut needs a clear leader, a split bar needs more than one card, a pace line needs five days of the month. The stat tile is the floor. → `insights.js › choose`
 
 **The server formats; the phone draws.** Every money string and colour slot arrives in the panel. The phone never formats money or chooses a colour. → `charts.js`
 
