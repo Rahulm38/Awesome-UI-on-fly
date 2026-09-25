@@ -43,10 +43,13 @@
   function activate(id) { const g = graph.nodeEl[id]; if (g && !/\b(done|bad|off)\b/.test(g.getAttribute('class'))) cls(id, 'active'); }
 
   // ── Jev / LLM switches: in the header and on the rows themselves ─────────
+  // A model is either up, simulated down (not called), or timing out (outage on).
+  const subFor = id => Engine.settings[id] === false ? 'simulated down' : (Engine.settings.outage && (id === 'jev' || id === 'llm')) ? 'timing out' : NODES[id].s;
+  bus.on('outage', () => ['jev', 'llm'].forEach(id => { NODES[id].sub.textContent = subFor(id); }));
   function setModel(id, on) {
     Engine.settings[id] = on;
     const n = NODES[id];
-    cls(id); n.sub.textContent = on ? n.s : 'simulated down';
+    cls(id); n.sub.textContent = subFor(id);
     document.querySelectorAll(`[data-model="${id}"]`).forEach(x => (x.checked = on));
     Engine.log(`simulation: ${n.t} ${on ? 'back up' : 'down'}${on ? '' : id === 'jev' ? ' → the LLM decides actions, the typing tray goes quiet' : ' → rules extract values'}`, on ? 'ok' : 'warn');
   }
@@ -77,7 +80,7 @@
     trace = t; spans = [];
     $('#live').className = 'live on'; $('#live').lastChild.textContent = t.previewOnly ? 'keystroke · insights only · Jev not called' : (t.replay ? 'recorded' : 'live') + (t.kind === 'typing' ? ' · keystroke' : ' · turn');
     if (t.previewOnly) setTimeout(() => say('preview'), 30);
-    for (const [id, n] of Object.entries(NODES)) { cls(id, id === 'phone' ? 'done' : 'idle'); n.ms.textContent = ''; n.sub.textContent = Engine.settings[id] === false ? 'simulated down' : n.s; }
+    for (const [id, n] of Object.entries(NODES)) { cls(id, id === 'phone' ? 'done' : 'idle'); n.ms.textContent = ''; n.sub.textContent = subFor(id); }
     $('#trace-label').textContent = `${t.kind === 'typing' ? 'keystroke' : 'turn'} · “${t.label.slice(0, 48)}”`;
     drawWF(); drawSummary();
   });

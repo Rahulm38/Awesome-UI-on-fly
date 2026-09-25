@@ -47,9 +47,9 @@ The phone is a spending screen with the assistant sheet open over it. Scenario b
 
 **While typing.** Spending questions show a live chart preview above the input as you type, in either mode. Switch *Call Jev* (under the phone) to **Every keystroke** and Jev scores each keystroke too: an action row, a *did you mean* list or a handoff appears before you press send.
 
-**Simulate models down.** (Simulation only — no real model is ever called.) In the system flow, turn **Jev** or the **LLM** off (the switches, or click the node). Jev off: the LLM decides actions too — slower, uncalibrated, no *did you mean*, no typing tray. LLM off: rules extract the values. Both off: the rules decider answers.
+**Simulate models down.** (Simulation only — no real model is ever called.) In the system flow, turn **Jev** or the **LLM** off (the switches in the system-flow header, or click the node). Jev off: the LLM decides actions too — slower, uncalibrated, no *did you mean*, no typing tray. LLM off: rules extract the values. Both off: the rules decider answers.
 
-**Simulate outage.** Toggle it: Jev and the LLM time out, the rules decider answers turns, and the typing tray goes quiet.
+**Simulate outage.** In the same place as the Jev/LLM switches — toggle it: Jev and the LLM time out, the rules decider answers turns, and the typing tray goes quiet.
 
 ## Safeguards
 

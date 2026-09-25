@@ -129,7 +129,7 @@
     setMode(b.dataset.mode);
     narrate(live ? '<b>Every keystroke</b> · Jev per key · tray before send' : '<b>On send</b> · Jev on send only · chart preview still live');
   });
-  $('#outage').addEventListener('change', e => { settings.outage = e.target.checked; log(settings.outage ? 'simulation: model outage → Jev + LLM time out, rules answer' : 'simulation: models back up', settings.outage ? 'warn' : 'ok'); });
+  $('#outage').addEventListener('change', e => { settings.outage = e.target.checked; document.body.classList.toggle('sim-outage', settings.outage); bus.emit('outage', settings.outage); log(settings.outage ? 'simulation: model outage → Jev + LLM time out, rules answer' : 'simulation: models back up', settings.outage ? 'warn' : 'ok'); });
 
   // ── scenarios ────────────────────────────────────────────────────────────
   // Tabs → groups → questions. Each row shows the question it will ask and, on the right, what you'll get.

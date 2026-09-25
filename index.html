@@ -22,13 +22,12 @@
   <meta name="twitter:description" content="Decisions and interfaces made on the fly — every model call, score and timing shown live.">
   <meta name="twitter:image" content="og-image.png">
   <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="site.css?v=39">
-  <link rel="stylesheet" href="phone.css?v=39">
+  <link rel="stylesheet" href="site.css?v=40">
+  <link rel="stylesheet" href="phone.css?v=40">
 </head>
 <body>
   <header class="top">
     <a class="brand" href="#"><span class="mark"><svg viewBox="0 0 24 24"><use href="#i-sparkle"/></svg></span><b>Awesome UI on Fly</b><span class="tagline">starring Nova</span></a>
-    <label class="tg" title="Simulation only — no real model is called. Jev and the LLM time out; the rules fallback answers."><input type="checkbox" id="outage" aria-label="Simulate a model outage"><span></span><b class="full">Simulate outage</b><b class="short">Outage</b></label>
     <a class="btn sm" href="architecture.html"><span class="full">Architecture</span><span class="short">Docs</span></a>
   </header>
 
@@ -102,7 +101,7 @@
       </div>
 
       <div class="panel" id="flow-panel">
-        <div class="ph"><h2>System flow</h2><small id="trace-label">waiting for a message</small><div class="r"><span class="sim-l" title="Simulation only — no real model is called">Simulate</span><label class="tg" title="Simulation only · turn Jev off and the LLM decides instead; the typing tray goes quiet"><input type="checkbox" data-model="jev" checked aria-label="Simulate Jev up or down"><span></span>Jev</label><label class="tg" title="Simulation only · turn the LLM off and rules extract the values"><input type="checkbox" data-model="llm" checked aria-label="Simulate LLM up or down"><span></span>LLM</label><span class="live" id="live"><i></i>idle</span></div></div>
+        <div class="ph"><h2>System flow</h2><small id="trace-label">waiting for a message</small><div class="r"><span class="sim-l" title="Simulation only — no real model is called">Simulate</span><label class="tg" title="Simulation only · turn Jev off and the LLM decides instead; the typing tray goes quiet"><input type="checkbox" data-model="jev" checked aria-label="Simulate Jev up or down"><span></span>Jev</label><label class="tg" title="Simulation only · turn the LLM off and rules extract the values"><input type="checkbox" data-model="llm" checked aria-label="Simulate LLM up or down"><span></span>LLM</label><label class="tg tg-out" title="Simulation only — Jev and the LLM are still called but time out (700 ms / 1.2 s); the rules fallback answers."><input type="checkbox" id="outage" aria-label="Simulate a model outage: Jev and the LLM time out"><span></span>Outage</label><span class="live" id="live"><i></i>idle</span></div></div>
         <div class="flow-wrap"><svg id="flow" role="img" aria-label="Request pipeline: client, orchestrator, then Jev, LLM and Insights in parallel (rules as fallback), safety gate, core banking, UI composer, back to the client. It animates each live request; the line below describes the current stage."></svg></div>
         <div class="flow-say" id="flow-say"><i></i><span>idle · the pipeline replays softly until something happens</span></div>
         <div class="summary" id="summary"><span>Waiting for the first request</span></div>
@@ -146,17 +145,17 @@
     <symbol id="i-sparkle" viewBox="0 0 24 24"><path fill="currentColor" d="M10 2.5c.5 4.4 2.6 6.5 7 7-4.4.5-6.5 2.6-7 7-.5-4.4-2.6-6.5-7-7 4.4-.5 6.5-2.6 7-7zM18.5 13c.25 2 1.2 3 3.2 3.2-2 .25-3 1.2-3.2 3.2-.25-2-1.2-3-3.2-3.2 2-.25 3-1.2 3.2-3.2zM5 16.5c.2 1.5.9 2.2 2.4 2.4-1.5.2-2.2.9-2.4 2.4-.2-1.5-.9-2.2-2.4-2.4 1.5-.2 2.2-.9 2.4-2.4z"/></symbol>
   </defs></svg>
 
-  <script src="js/a11y.js?v=39"></script>
-  <script src="js/flowgraph.js?v=39"></script>
-  <script src="js/data.js?v=39"></script>
-  <script src="js/jev.js?v=39"></script>
-  <script src="js/llm.js?v=39"></script>
-  <script src="js/insights.js?v=39"></script>
-  <script src="js/engine.js?v=39"></script>
-  <script src="js/charts.js?v=39"></script>
-  <script src="js/phone.js?v=39"></script>
-  <script src="js/inspector.js?v=39"></script>
-  <script src="js/main.js?v=39"></script>
-  <script src="js/guide.js?v=39"></script>
+  <script src="js/a11y.js?v=40"></script>
+  <script src="js/flowgraph.js?v=40"></script>
+  <script src="js/data.js?v=40"></script>
+  <script src="js/jev.js?v=40"></script>
+  <script src="js/llm.js?v=40"></script>
+  <script src="js/insights.js?v=40"></script>
+  <script src="js/engine.js?v=40"></script>
+  <script src="js/charts.js?v=40"></script>
+  <script src="js/phone.js?v=40"></script>
+  <script src="js/inspector.js?v=40"></script>
+  <script src="js/main.js?v=40"></script>
+  <script src="js/guide.js?v=40"></script>
 </body>
 </html>
