@@ -28,7 +28,7 @@
     el.classList.remove('in'); void el.offsetWidth; el.textContent = txt; el.classList.add('in');
     A11y.announce(txt, { channel: 'flow', delay: 1200 });   // hops come fast; read out only the stage it settles on
     $('#flow-say').style.setProperty('--sc', (NODES[id] || (id === 'preview' ? NODES.insight : NODES.bank)).c);
-    sayT = setTimeout(() => { el.classList.remove('in'); el.textContent = recorded.length ? 'idle · replaying the last request' : 'idle · the pipeline replays softly until something happens'; $('#flow-say').style.removeProperty('--sc'); }, 6000);
+    sayT = setTimeout(() => { el.classList.remove('in'); el.textContent = ''; $('#flow-say').style.removeProperty('--sc'); }, 6000);
   }
   async function hop(from, to) {
     const target = to === 'phone' ? 'render' : to;
@@ -78,6 +78,7 @@
     if (recording.length > 3) { recorded = recording; showFlows(recorded); }
     recording = [];
     trace = t; spans = [];
+    settleLive(t.kind === 'typing' ? 1500 : 0);
     $('#live').className = 'live on'; $('#live').lastChild.textContent = t.previewOnly ? 'keystroke · insights only · Jev not called' : (t.replay ? 'recorded' : 'live') + (t.kind === 'typing' ? ' · keystroke' : ' · turn');
     if (t.previewOnly) setTimeout(() => say('preview'), 30);
     for (const [id, n] of Object.entries(NODES)) { cls(id, id === 'phone' ? 'done' : 'idle'); n.ms.textContent = ''; n.sub.textContent = subFor(id); }
@@ -98,6 +99,13 @@
     drawWF(); drawSummary();
     if (s.node !== 'orch') showJson(s);
   });
+  // The status badge reflects activity, then settles back once things go quiet.
+  let liveT = 0;
+  function settleLive(ms) {
+    clearTimeout(liveT);
+    if (!ms) return;
+    liveT = setTimeout(() => { $('#live').className = 'live'; $('#live').lastChild.textContent = recorded.length ? 'replaying last request' : 'idle'; }, ms);
+  }
   bus.on('turnDone', () => { hop('composer', 'phone').then(() => { cls('render', 'done'); NODES.render.ms.textContent = '✓'; }); setTimeout(() => { recorded = recording.slice(); showFlows(recorded); $('#live').className = 'live'; $('#live').lastChild.textContent = 'replaying last request'; }, 500); });
 
   function drawSummary() {
@@ -108,7 +116,6 @@
     const items = [['Total', `${Math.round(end)} ms`, 'tot']];
     [['Jev', 'jev'], ['LLM', 'llm'], ['Rules', 'rules'], ['Insights', 'insight'], ['Gate', 'safety'], ['Bank', 'bank']].forEach(([l, id]) => { const v = by(id); if (v) items.push([l, `${Math.round(v)} ms`]); });
     if (ins) items.push(['Snapshot', ins.req.snapshot]);
-    if (spans.some(s => s.node === 'jev') && spans.some(s => s.node === 'llm')) items.push(['Jev ∥ LLM ∥ Insights', 'parallel']);
     $('#summary').innerHTML = items.map(([l, v, c]) => `<span class="${c || ''}">${l}<b>${esc(v)}</b></span>`).join('');
   }
 
@@ -175,7 +182,7 @@
     const barOf = s => (s.type === 'handoff' ? T.handoff : s.highStakes ? T.highStakes : T.act);
     const rows = d.scores.slice(0, 5).map(s => {
       const bar = barOf(s), chosen = top && top.id === s.id, cand = d.candidates.some(c => c.id === s.id);
-      return `<div class="sr${chosen ? ' chosen' : ''}${cand ? ' cand' : ''}" title="${s.type === 'handoff' ? 'opens a screen · ' : ''}${s.highStakes ? 'high stakes · ' : ''}bar ${bar}">
+      return `<div class="sr${chosen ? ' chosen' : ''}${cand ? ' cand' : ''}" title="${s.type === 'handoff' ? 'opens a screen · ' : ''}${s.highStakes ? 'high stakes · ' : ''}needs ${bar.toFixed(2)} to act">
         <span class="sr-l">${esc(s.label)}${s.highStakes ? '<em>▲</em>' : ''}${s.type === 'handoff' ? '<em>↗</em>' : ''}</span>
         <span class="sr-t"><i style="width:${s.p * 100}%" class="${s.p >= bar ? 'pass' : ''}"></i><b style="left:${bar * 100}%"></b></span>
         <span class="sr-v">${s.p.toFixed(2)}</span></div>`;
@@ -211,7 +218,17 @@
       <div class="call-b"><div><small>request</small><pre>${esc(compact(req))}</pre></div><div><small>response</small><pre>${esc(compact(res))}</pre></div></div>
       <div class="sel"><small>selection</small><ol>${steps}</ol><div class="choice-line" style="animation-delay:${si * 160 + 80}ms">choice → <b class="${choice ? '' : 'null'}">${choice || 'null'}</b>${choice ? '' : ` <em>· ${d.verdict.toLowerCase()}</em>`}</div></div>
     </div>`;
-    box.innerHTML = head + `<div class="srs">${rows}</div>` + call + (told ? `<div class="told-row"><small>phone told</small>${told}</div>` : '');
+    // When Jev isn't the one deciding, show how the fallback pattern-matcher got there.
+    let body = `<div class="srs">${rows}</div>`;
+    if (d.source !== 'jev') {
+      const byChoice = {};
+      (d.features || []).forEach(f => { const m = /^(\S+) ([+-][\d.]+) ← (.*)$/.exec(f); if (!m) return; (byChoice[m[1]] = byChoice[m[1]] || { sum: 0, hits: [] }); byChoice[m[1]].sum += +m[2]; byChoice[m[1]].hits.push(`${m[3]} ${m[2]}`); });
+      const list = Object.entries(byChoice).sort((a, b) => b[1].sum - a[1].sum);
+      body = `<div class="rules-view"><div class="rv-h">${d.source === 'llm' ? 'LLM decided (Jev off) · simulated with the same patterns' : 'Rules classifier · deterministic pattern match'}</div>
+        ${list.length ? list.map(([id, v]) => `<div class="rv-row${top && top.id === id ? ' win' : ''}"><b>${esc(id)}</b><span>${v.hits.map(esc).join(' · ')}</span><em>Σ ${v.sum.toFixed(1)}</em></div>`).join('') : '<div class="rv-row"><span>no pattern matched</span></div>'}
+        <div class="rv-note">exact words only · no probabilities · no “did you mean” · no typing tray — why Jev exists</div></div>`;
+    }
+    box.innerHTML = head + body + call + (told ? `<div class="told-row"><small>phone told</small>${told}</div>` : '');
     $('#scores-text').textContent = `“${cur.text.slice(0, 60)}”`;
   }
 

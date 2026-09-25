@@ -31,12 +31,15 @@
     [/\b(shopping|clothes)\b/, 'Shopping'],
     [/\b(entertainment|streaming|subscriptions?)\b/, 'Entertainment'],
     [/\b(flights?|airfare)\b/, 'Travel'],
+      [/\b(health|pharmacy|medical|doctor|medicine|gym)\b/, 'Health'], [/\b(utilit(y|ies)|electricity|power bill|internet|phone bill|mobile bill)\b/, 'Utilities'],
+    [/\b(household|home goods)\b/, 'Household'], [/\b(personal care|salon|beauty|haircut)\b/, 'Personal care'], [/\b(education|courses?|learning|tuition)\b/, 'Education'],
+    [/\b(pets?|pet food|vet)\b/, 'Pets'], [/\b(gifts?|flowers?)\b/, 'Gifts'],
   ];
 
   const Slots = {
     extract(text) {
       const t = text.toLowerCase(), s = {};
-      for (const c of D.cards) if (t.includes(c.last4) || t.includes(c.name.toLowerCase() + ' card') || t.includes('my ' + c.name.toLowerCase()))
+      for (const c of D.cards) if (t.includes(c.last4) || t.includes(c.name.toLowerCase() + ' card'))
         { s.cardId = c.id; break; }
       if (/\b(all|every|both)\b.*\bcards\b|\ball (of )?my cards\b/.test(t)) s.allCards = true;
 

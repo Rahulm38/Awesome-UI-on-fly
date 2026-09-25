@@ -92,7 +92,11 @@
     if (!opening) { chat.appendChild(g); opening = g; }
   };
   Phone.started = () => chat.querySelector('.me') !== null;
-  Phone.user = text => { chat.appendChild(el('div', 'me', esc(text))); scroll(); };
+  Phone.user = (text, changes) => {
+    chat.appendChild(el('div', 'me', esc(text)));
+    if (changes && changes.length) chat.appendChild(el('div', 'me-note', `Corrected from “${esc(changes.map(c => c[0]).join(', '))}”`));
+    scroll();
+  };
   Phone.thinking = () => {
     const e = el('div', 'thinking', '<svg viewBox="0 0 24 24"><use href="#i-sparkle"/></svg><span>Thinking</span>');
     chat.appendChild(e); scroll();
@@ -107,8 +111,12 @@
   const DRAW = {
     ANSWER: b => el('div', 'bubble', md(b.text)),
     CHART: b => {
-      const c = Charts.render(b.panel, false, true);
-      if (b.built != null) { const t = el('span', 'built', b.built === 'typed' ? `⚡ built while you typed · ${b.panel.visual} · reused` : `⚡ built on the fly · ${b.panel.visual} · ${b.built} ms`); c.appendChild(t); setTimeout(() => t.classList.add('gone'), 2600); }
+      const c = Charts.renderDeck(b.panel.pages || [b.panel]);
+      // The product UI stays clean: a brief highlight says "new", the details go to the site's log.
+      if (b.built != null) {
+        c.classList.add('fresh'); setTimeout(() => c.classList.remove('fresh'), 1600);
+        Engine.log(b.built === 'typed' ? `phone: ${b.panel.visual} reused — it was built while you typed` : `phone: ${b.panel.visual} built on the fly in ${b.built} ms`, 'ok');
+      }
       return c;
     },
     STATUS(b, off) {
@@ -153,7 +161,7 @@
     if (!pres || pres.type === 'NONE' || (pres.type === 'READ' && !pres.panel)) { tray.hidden = true; return; }
     tray.hidden = false;
     const commit = extra => { tray.hidden = true; Phone.on.commit(extra || {}); };
-    const pct = p => `<em>${Math.round(p * 100)}%</em>`;
+    const pct = () => '';   // scores belong to the Decision tab, not the product UI
     const GO = '<span class="go">›</span>';
 
     if (pres.type === 'CANDIDATES') {
@@ -162,9 +170,11 @@
       return;
     }
     if (pres.type === 'READ') {
-      tray.appendChild(el('div', 'tray-h', pres.previewOnly ? 'Preview · from Insights only — Jev not called yet' : 'Preview · Jev + Insights'));
-      tray.appendChild(Charts.render(pres.panel, true));
-      const r = el('button', 'tray-row', `<span class="ti">▦</span><span>See the full answer</span>${GO}`); r.onclick = () => commit(); tray.appendChild(r); return;
+      // Like the app: the answer's own card sits above the input while you type. Tap it to send.
+      const card = Charts.renderDeck(pres.panel.pages || [pres.panel], true);
+      card.classList.add('tap-send'); card.title = 'Send';
+      card.addEventListener('click', e => { if (!e.target.closest('.ic-row, .ic-pager')) commit(); });
+      tray.appendChild(card); return;
     }
     if (pres.type === 'HANDOFF') {
       const r = el('button', 'tray-row', `<span class="ti">${pres.icon}</span><span>${esc(pres.label)}<small>Opens ${esc(pres.screen)}</small></span>${pct(pres.p)}${GO}`);
@@ -189,8 +199,7 @@
     tray.appendChild(go);
   };
 
-  input.addEventListener('input', () => $('#trail').classList.toggle('send', !!input.value.trim()));
-  Phone.clearInput = () => { input.value = ''; $('#trail').classList.remove('send'); };
+  Phone.clearInput = () => { input.value = ''; };
 
   window.Phone = Phone;
 })();

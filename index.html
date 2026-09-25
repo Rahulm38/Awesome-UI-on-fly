@@ -22,8 +22,8 @@
   <meta name="twitter:description" content="Decisions and interfaces made on the fly — every model call, score and timing shown live.">
   <meta name="twitter:image" content="og-image.png">
   <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="site.css?v=40">
-  <link rel="stylesheet" href="phone.css?v=40">
+  <link rel="stylesheet" href="site.css?v=49">
+  <link rel="stylesheet" href="phone.css?v=49">
 </head>
 <body>
   <header class="top">
@@ -32,20 +32,16 @@
   </header>
 
   <section class="hero">
-    <span class="eyebrow"><i></i>Awesome UI on Fly · runs entirely in your browser</span>
+    <span class="eyebrow"><i></i>Runs in your browser</span>
       <h1>Decisions and interfaces, <em>made on the fly.</em></h1>
-      <ul class="points">
-        <li><b>Jev</b> decides</li><li><b>LLM</b> fills in</li><li><b>Gate</b> guards</li><li><b>UI</b> drawn per question</li><li><b>Every call</b> shown live</li>
-      </ul>
       <div class="hero-cta">
         <button class="btn primary" id="tour"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>Play the tour</button>
-        <a class="btn" href="#try">Try it yourself</a>
       </div>
     <div class="stats">
-      <span class="stat"><b>3 calls</b>in parallel per turn</span>
-      <span class="stat"><b>14 charts</b>picked from the data</span>
-      <span class="stat"><b>0.60 / 0.70</b>bars to act · to act irreversibly</span>
-      <span class="stat"><b>1 road</b>to the bank, read back before ✓</span>
+      <span class="stat"><b>3 models at once</b>for every message</span>
+      <span class="stat"><b>14 chart types</b>chosen to fit each answer</span>
+      <span class="stat"><b>60% sure</b>before acting · <b>70%</b> for anything that can’t be undone</span>
+      <span class="stat"><b>✓ only</b>after the bank confirms the change</span>
     </div>
   </section>
 
@@ -75,9 +71,11 @@
             <div class="chat" id="chat"></div>
             <div class="tray" id="tray" hidden></div>
             <form class="inputbar" id="composer" autocomplete="off">
+              <button type="button" class="mic" id="mic" aria-label="Speak">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+              </button>
               <input id="input" placeholder="Ask Nova…" aria-label="Message Nova">
-              <button class="trail" id="trail" aria-label="Send">
-                <svg class="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+              <button class="trail send" id="trail" aria-label="Send">
                 <svg class="i-send" viewBox="0 0 24 24"><path d="M3.4 20.4 21 12 3.4 3.6l-.01 6.53L15 12 3.39 13.87z" fill="currentColor"/></svg>
               </button>
             </form>
@@ -88,13 +86,13 @@
       </div>
       <div class="under">
         <div class="seg" id="mode-seg" role="radiogroup" aria-label="When to call Jev"><span class="seg-l">Call Jev</span><button data-mode="send" class="on" role="radio" aria-checked="true">On send</button><button data-mode="live" role="radio" aria-checked="false">Every keystroke</button></div>
-        <p class="caption">Card chip = context · <span class="kbd">/</span> type · <span class="kbd">Esc</span> scenarios</p>
+        <p class="caption"><span class="kbd">/</span> to type · <span class="kbd">Esc</span> for scenarios</p>
       </div>
     </section>
 
     <section class="inspector">
       <div class="panel" id="try">
-        <div class="ph"><h2>Scenarios</h2><small>click a question · it’s typed into the phone for you</small></div>
+        <div class="ph"><h2>Scenarios</h2><small>click to play</small></div>
         <div class="scen-tabs" id="scen-tabs" role="tablist" aria-label="Scenario groups"></div>
         <div class="scen" id="scenarios" role="tabpanel"></div>
         <div class="narrate" id="narrate"><span class="np"><i class="np-dot"></i><span><b>Pick one</b> · or type in the phone</span></span></div>
@@ -103,7 +101,7 @@
       <div class="panel" id="flow-panel">
         <div class="ph"><h2>System flow</h2><small id="trace-label">waiting for a message</small><div class="r"><span class="sim-l" title="Simulation only — no real model is called">Simulate</span><label class="tg" title="Simulation only · turn Jev off and the LLM decides instead; the typing tray goes quiet"><input type="checkbox" data-model="jev" checked aria-label="Simulate Jev up or down"><span></span>Jev</label><label class="tg" title="Simulation only · turn the LLM off and rules extract the values"><input type="checkbox" data-model="llm" checked aria-label="Simulate LLM up or down"><span></span>LLM</label><label class="tg tg-out" title="Simulation only — Jev and the LLM are still called but time out (700 ms / 1.2 s); the rules fallback answers."><input type="checkbox" id="outage" aria-label="Simulate a model outage: Jev and the LLM time out"><span></span>Outage</label><span class="live" id="live"><i></i>idle</span></div></div>
         <div class="flow-wrap"><svg id="flow" role="img" aria-label="Request pipeline: client, orchestrator, then Jev, LLM and Insights in parallel (rules as fallback), safety gate, core banking, UI composer, back to the client. It animates each live request; the line below describes the current stage."></svg></div>
-        <div class="flow-say" id="flow-say"><i></i><span>idle · the pipeline replays softly until something happens</span></div>
+        <div class="flow-say" id="flow-say"><i></i><span></span></div>
         <div class="summary" id="summary"><span>Waiting for the first request</span></div>
       </div>
 
@@ -132,30 +130,31 @@
   <section class="how">
     <h2>How a message becomes UI</h2>
     <div class="steps">
-      <div class="step"><b>Decide</b><ul><li>Jev scores a closed catalogue</li><li>Can’t invent actions</li><li>Near tie → ask</li></ul></div>
-      <div class="step"><b>Fill in</b><ul><li>LLM extracts values</li><li>Insights read a warm snapshot</li><li>All in parallel</li></ul></div>
-      <div class="step"><b>Guard</b><ul><li>Resolve card · check eligibility</li><li>Lane: act · confirm · ask · read</li><li>Read-back before ✓</li></ul></div>
-      <div class="step"><b>Draw</b><ul><li>Chart picked from data shape</li><li>Status rows · chips · CTA</li><li>Phone only renders</li></ul></div>
+      <div class="step"><b>Decide</b><ul><li>Jev scores a closed list</li><li>Near tie → ask</li></ul></div>
+      <div class="step"><b>Fill in</b><ul><li>LLM reads the values</li><li>Insights, in parallel</li></ul></div>
+      <div class="step"><b>Guard</b><ul><li>Card · eligibility · confirm</li><li>Read back before ✓</li></ul></div>
+      <div class="step"><b>Draw</b><ul><li>Chart fits the data</li><li>Phone only renders</li></ul></div>
     </div>
   </section>
 
-  <footer class="foot"><span>Awesome UI on Fly · assistant “Nova” · fictional data · no network calls</span><span><button class="linkish" id="guide-again" type="button">Show the guide</button> · <a href="architecture.html">Architecture</a> · <a href="architecture.html#rules">Design rules</a></span></footer>
+  <footer class="foot"><span>Fictional data · no network calls</span><span><button class="linkish" id="guide-again" type="button">Show the guide</button> · <a href="architecture.html">Architecture</a> · <a href="architecture.html#rules">Design rules</a></span></footer>
 
   <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
     <symbol id="i-sparkle" viewBox="0 0 24 24"><path fill="currentColor" d="M10 2.5c.5 4.4 2.6 6.5 7 7-4.4.5-6.5 2.6-7 7-.5-4.4-2.6-6.5-7-7 4.4-.5 6.5-2.6 7-7zM18.5 13c.25 2 1.2 3 3.2 3.2-2 .25-3 1.2-3.2 3.2-.25-2-1.2-3-3.2-3.2 2-.25 3-1.2 3.2-3.2zM5 16.5c.2 1.5.9 2.2 2.4 2.4-1.5.2-2.2.9-2.4 2.4-.2-1.5-.9-2.2-2.4-2.4 1.5-.2 2.2-.9 2.4-2.4z"/></symbol>
   </defs></svg>
 
-  <script src="js/a11y.js?v=40"></script>
-  <script src="js/flowgraph.js?v=40"></script>
-  <script src="js/data.js?v=40"></script>
-  <script src="js/jev.js?v=40"></script>
-  <script src="js/llm.js?v=40"></script>
-  <script src="js/insights.js?v=40"></script>
-  <script src="js/engine.js?v=40"></script>
-  <script src="js/charts.js?v=40"></script>
-  <script src="js/phone.js?v=40"></script>
-  <script src="js/inspector.js?v=40"></script>
-  <script src="js/main.js?v=40"></script>
-  <script src="js/guide.js?v=40"></script>
+  <script src="js/a11y.js?v=49"></script>
+  <script src="js/flowgraph.js?v=49"></script>
+  <script src="js/data.js?v=49"></script>
+  <script src="js/jev.js?v=49"></script>
+  <script src="js/llm.js?v=49"></script>
+  <script src="js/insights.js?v=49"></script>
+  <script src="js/engine.js?v=49"></script>
+  <script src="js/charts.js?v=49"></script>
+  <script src="js/phone.js?v=49"></script>
+  <script src="js/inspector.js?v=49"></script>
+  <script src="js/correct.js?v=49"></script>
+  <script src="js/main.js?v=49"></script>
+  <script src="js/guide.js?v=49"></script>
 </body>
 </html>

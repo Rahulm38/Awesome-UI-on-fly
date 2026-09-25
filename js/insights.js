@@ -25,8 +25,11 @@
   // ── read: the question → closed lists ────────────────────────────────────
   const CATS = [
     [/\b(food|dining|restaurants?|eat\w*|coffee|lunch|dinner)\b/, 'Food & Dining'], [/\b(groceries|grocery|supermarket)\b/, 'Groceries'],
-    [/\b(transport|rides?|taxi|gas|fuel)\b/, 'Transport'], [/\b(shopping|clothes)\b/, 'Shopping'],
+    [/\b(transport|transportation|rides?|taxi|gas|fuel|petrol|gasoline|diesel)\b/, 'Transport'], [/\b(shopping|clothes)\b/, 'Shopping'],
     [/\b(entertainment|movies|streaming)\b/, 'Entertainment'], [/\b(flights?|airfare|travel spend)\b/, 'Travel'],
+      [/\b(health|pharmacy|medical|doctor|medicine|gym)\b/, 'Health'], [/\b(utilit(y|ies)|electricity|power bill|internet|phone bill|mobile bill)\b/, 'Utilities'],
+    [/\b(household|home goods)\b/, 'Household'], [/\b(personal care|salon|beauty|haircut)\b/, 'Personal care'], [/\b(education|courses?|learning|tuition)\b/, 'Education'],
+    [/\b(pets?|pet food|vet)\b/, 'Pets'], [/\b(gifts?|flowers?)\b/, 'Gifts'],
   ];
   const INTENTS = [
     ['UNUSUAL', /\b(unusual|strange|suspicious|weird|odd|out of the ordinary)\b/],
@@ -38,24 +41,51 @@
     ['HABIT', /\bhow often\b|\bvisits?\b|\bhabit\b/],
     ['NORMAL', /\ba lot\b|\bnormal\b|\btypical\b|\busual\b|\btoo much\b/],
     ['BY_CARD', /\bby card\b|\bwhich card\b|\beach card\b|debit (vs|or) credit/],
+    ['TOP', /\bby merchants?\b|\bmerchants?\b|\bwhere (do|did) i (shop|buy)\b|\btop\b|\bbiggest\b|\bmost\b/],
     ['COMPARE', /\bvs\.?\b|\bversus\b|\bcompare\b|\bor\b/],
-    ['TOP', /\btop\b|\bbiggest\b|\bmost\b|\bmerchants\b/],
     ['BREAKDOWN', /\bwhere did\b|\bbreakdown\b|\bshare\b|\bsplit\b|\bcategor(y|ies)\b|money (go|went)/],
     ['TREND', /\btrend|over time|(per|by|each) (week|month)|weekly|monthly|last (\d|three|six) months/],
   ];
+  // Small typo tolerance, the way the LLM would read "merhcant" or "subscirptions".
+  const VOCAB = ['merchant', 'merchants', 'subscriptions', 'subscription', 'compare', 'category', 'categories', 'spending', 'breakdown', 'unusual', 'weekday', 'groceries', 'transport', 'restaurants'];
+  const KEEP = new Set(['month', 'months', 'monthly', 'week', 'weeks', 'weekly', 'weekend', 'weekends', 'today', 'spent', 'spend', 'money', 'where', 'which', 'much', 'last', 'this', 'past']);
+  const dist = (a, b) => { const m = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) m[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) m[i][j] = Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1] ? m[i - 2][j - 2] + 1 : 99); return m[a.length][b.length]; };
+  const fix = w => {
+    if (w.length < 6 || KEEP.has(w) || VOCAB.includes(w)) return w;
+    const best = VOCAB.filter(v => v[0] === w[0]).map(v => [v, dist(w, v)]).filter(([, d]) => d <= (w.length >= 8 ? 2 : 1)).sort((x, y) => x[1] - y[1])[0];
+    return best ? best[0] : w;
+  };
+  const NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, eight: 8, twelve: 12 };
   function read(text) {
-    const t = text.toLowerCase().replace(/’/g, "'");
+    const t = text.toLowerCase().replace(/’/g, "'").replace(/[a-z]+/g, fix);
     const subjects = [];
     CATS.forEach(([re, c]) => { if (re.test(t)) subjects.push({ kind: 'category', name: c }); });
     D.merchants.forEach(m => { if (t.includes(m.toLowerCase()) || new RegExp('\\b' + m.split(' ')[0].toLowerCase() + '\\b').test(t)) subjects.push({ kind: 'merchant', name: m }); });
     let intent = (INTENTS.find(([, re]) => re.test(t)) || ['TOTAL'])[0];
     if (intent === 'COMPARE' && subjects.length < 2) intent = /last month/.test(t) ? 'PACE' : 'TOTAL';
     if (intent === 'HABIT' && !subjects.some(s => s.kind === 'merchant')) intent = 'TOTAL';
-    const period = /\btoday\b/.test(t) ? 'today' : /\byesterday\b/.test(t) ? 'yesterday' : /\blast week\b/.test(t) ? 'last week' : /\bthis week\b/.test(t) ? 'this week'
+    const nm = t.match(/\b(?:last|past) (\d+|one|two|three|four|five|six|eight|twelve) (day|week|month)s?\b/);
+    const custom = nm && { n: +(NUM[nm[1]] || nm[1]), unit: nm[2] };
+    const period = custom && !['6 month', '3 month', '30 day', '8 week'].includes(`${custom.n} ${custom.unit}`) ? `last ${custom.n} ${custom.unit}s`
+      : /\btoday\b/.test(t) ? 'today' : /\byesterday\b/.test(t) ? 'yesterday' : /\blast week\b/.test(t) ? 'last week' : /\bthis week\b/.test(t) ? 'this week'
       : /\blast month\b/.test(t) ? 'last month' : /last (6|six) months/.test(t) ? 'last 6 months' : /last (3|three) months/.test(t) ? 'last 3 months'
       : /30 days/.test(t) ? 'last 30 days' : intent === 'TREND' ? (/week/.test(t) ? 'last 8 weeks' : 'last 6 months') : 'this month';
     const split = /week/.test(t) && intent === 'TREND' ? 'WEEK' : intent === 'TREND' ? 'MONTH' : null;
-    return { intent, subjects, period, split };
+    // "split by …": card / debit-vs-credit / merchant / category, optionally over time.
+    const by = {
+      card: /\b(by|per|each|across|split by) cards?\b|\bsplit\b.*\bcards?\b|\bcards?\b.*\bsplit\b/.test(t),
+      type: /\bdebit\b.*\bcredit\b|\bcredit\b.*\bdebit\b|\bby type\b/.test(t),
+      merchant: /\bmerchants?\b/.test(t),
+      time: /\b(by|per|each) (month|week)|\bmonthly\b|\bweekly\b|\bover time\b|last (\d+|two|three|four|six) months/.test(t),
+    };
+    if ((by.card || by.type) && by.time) intent = 'STACK';
+    else if (by.type) intent = 'BY_TYPE';
+    else if (by.card && intent !== 'TREND') intent = 'BY_CARD';
+    const stackSplit = /week/.test(t) ? 'WEEK' : 'MONTH';
+    return { raw: t, intent, subjects, period: intent === 'STACK' && period === 'this month' ? (stackSplit === 'WEEK' ? 'last 8 weeks' : 'last 3 months') : period,
+      split: intent === 'STACK' ? stackSplit : split, by };
   }
 
   function range(p) {
@@ -70,7 +100,12 @@
       case 'last 3 months': return { a: addM(som(TODAY), -2), b: TODAY, label: 'in the last 3 months', partial: true };
       case 'last 6 months': return { a: addM(som(TODAY), -5), b: TODAY, label: 'in the last 6 months', partial: true };
       case 'last 8 weeks': return { a: day(monday(TODAY), -49), b: TODAY, label: 'in the last 8 weeks', partial: true };
-      default: return { a: som(TODAY), b: TODAY, label: `in ${mon(TODAY)} so far`, partial: true };
+      default: {
+        const m = /^last (\d+) (day|week|month)s$/.exec(p);
+        if (m) { const n = +m[1], a = m[2] === 'month' ? addM(som(TODAY), -(n - 1)) : day(TODAY, -(n * (m[2] === 'week' ? 7 : 1) - 1));
+          return { a, b: TODAY, label: `in the last ${n} ${m[2]}${n > 1 ? 's' : ''}`, partial: true }; }
+        return { a: som(TODAY), b: TODAY, label: `in ${mon(TODAY)} so far`, partial: true };
+      }
     }
   }
   // The same span, one period earlier — for "vs last time".
@@ -87,6 +122,9 @@
     const ok = (v, why) => ({ visual: v, why, ladder });
     const fall = (v, why) => { ladder.push(`${v}: ${why}`); };
     const { intent } = q;
+    if (intent === 'STACK') return ok('V6', `split by ${q.by.type ? 'debit vs credit' : 'card'} over ${q.split === 'WEEK' ? 'weeks' : 'months'} → stacked columns`);
+    if (intent === 'BY_TYPE') return ok('V5', 'debit vs credit → one split bar');
+    if (intent === 'TOP' && q.subjects.some(s => s.kind === 'category')) return ok('V7', 'merchants inside a category → ranked with logos, tap one for its payments');
     if (intent === 'UNUSUAL') return ok('V21', 'asked for anything unusual');
     if (intent === 'SUBSCRIPTIONS') return ok('V14', 'asked about recurring payments');
     if (intent === 'LIMIT') { if (ctx.limit) return ok('V9', 'a limit exists → meter with an even-pace tick'); fall('V9', 'no limit set on this card'); }
@@ -95,9 +133,10 @@
     if (intent === 'WEEKDAY') return ok('V12', 'asked about days → weekday strip');
     if (intent === 'HABIT') return ok('V13', 'a merchant + how often → visits and last visit');
     if (intent === 'NORMAL') { if (ctx.history >= 3) return ok('V18', 'your usual range as a band, this month as a marker'); fall('V18', 'under 3 months of history'); }
-    if (intent === 'BY_CARD') { if (ctx.topShare < 0.97) return ok('V5', 'one 100% bar split by card'); fall('V5', `${Math.round(ctx.topShare * 100)}% on one card — a split bar would be a single colour`); }
+    if (intent === 'BY_CARD') { if (ctx.topShare < 0.97 || q.subjects.length) return ok('V5', 'one 100% bar split by card'); fall('V5', `${Math.round(ctx.topShare * 100)}% on one card — a split bar would be a single colour`); }
     if (intent === 'COMPARE' && q.subjects.length >= 2) return ok('V2', 'two subjects → face-off');
     if (intent === 'TOP') return ok('V7', 'ranked merchants, top 5 + other');
+    if (intent === 'BREAKDOWN' && q.subjects.some(x => x.kind === 'category') && /\bshare\b|\bpercent|\bportion\b|\bhow much of\b/.test(q.raw || '')) return ok('V8', 'the share of one category → donut of the whole, that category called out');
     if (intent === 'BREAKDOWN') {
       if (ctx.ratio >= 1.3) return ok('V8', `top slice is ${ctx.ratio.toFixed(1)}× the next → donut reads clearly`);
       fall('V8', `top slice only ${ctx.ratio.toFixed(1)}× the next (< 1.3×) → a donut would be unreadable`);
@@ -108,8 +147,9 @@
   }
 
   // ── build ────────────────────────────────────────────────────────────────
-  function build(text, scope) {
+  function build(text, scope, only) {
     const q = read(text);
+    if (only) { q.subjects = [only]; if (q.intent === 'COMPARE') q.intent = 'TOTAL'; }
     const r = range(q.period);
     const base = D.txns.filter(t => !scope.cardId || t.cardId === scope.cardId);
     const subj = q.subjects[0];
@@ -123,7 +163,11 @@
     const ctx = { limit: card && card.limit, history: 6, ratio: cats.length > 1 ? cats[0][1] / cats[1][1] : 9, topShare: Math.max(0, ...Object.values(byCard)) / cardTot };
     const pickV = choose(q, ctx);
     const what = subj ? subj.name : 'everything';
-    const scopeLbl = scope.cardId ? D.tag(D.card(scope.cardId)) : 'All cards';
+    const scopeLbl = scope.cardId ? D.tag(D.card(scope.cardId)) : `${D.cards.filter(c => !c.archived).length} cards`;
+    const nm = /^last (\d+) (day|week|month)s$/.exec(q.period);
+    const per = q.period === 'this month' ? mon(TODAY) : q.period === 'last month' ? mon(addM(som(TODAY), -1)) : q.period === 'this week' ? 'This week'
+      : q.period === 'last week' ? 'Last week' : q.period === 'today' ? 'Today' : q.period === 'yesterday' ? 'Yesterday'
+      : nm && nm[2] === 'week' ? `${nm[1]} wks` : nm && nm[2] === 'day' ? `${nm[1]} days` : `${mon(r.a)}–${mon(r.b)}`;
     const P = { visual: pickV.visual, why: pickV.why, ladder: pickV.ladder, read: q, footer: `${md(r.a)} – ${md(r.b)}${r.partial ? ' · so far' : ''} · ${scopeLbl}` };
     const total = sum(cur);
 
@@ -133,9 +177,10 @@
         const d = prev ? (total - prev) / prev : null;
         const spark = [];
         for (let i = 5; i >= 0; i--) { const a = addM(som(TODAY), -i); spark.push(sum(pick(a, i ? day(addM(a, 1), -1) : TODAY))); }
-        Object.assign(P, { title: `Spent on ${what}`, hero: { display: money(total), delta: d == null ? null : Math.abs(d) < 0.03 ? '≈ about the same' : `${d > 0 ? '↑' : '↓'} ${Math.abs(Math.round(d * 100))}% vs ${pr.label}` },
+        const chg = d == null ? '' : Math.abs(d) < 0.03 ? ` · about the same as ${pr.label}` : ` · ${Math.abs(Math.round(d * 100))}% ${d > 0 ? 'more' : 'less'} than ${pr.label}`;
+        Object.assign(P, { hero: { display: money(total) },
           series: [{ colorSlot: 0, points: spark.map((v, i) => ({ label: mon(addM(som(TODAY), i - 5)), amount: v })) }],
-          takeaway: total === 0 ? `${money(0)} on ${what} ${r.label}` : `${money(total)} on ${what} ${r.label} across ${cur.length} payments` });
+          takeaway: total === 0 ? `${money(0)} on ${what} ${r.label}` : `${money(total)} on ${what} ${r.label}${chg}` });
         if (!ctx.limit && q.intent === 'LIMIT') P.takeaway = 'No limit is set, so here’s what you’ve spent instead';
       },
       V2() {
@@ -158,23 +203,43 @@
           takeaway: med >= 1 ? `${last.partial ? 'So far' : 'Latest'} ${short(last.amount)} — your usual is ${short(med)}` : `${short(last.amount)} ${last.partial ? 'so far' : ''}` });
       },
       V5() {
-        const pts = Object.entries(byCard).sort((a, b) => b[1] - a[1]).map(([id, v], i) => ({ label: D.tag(D.card(id)), amount: v, display: money(v), share: v / cardTot, colorSlot: i ? i : 0 }));
-        Object.assign(P, { title: `${what[0].toUpperCase() + what.slice(1)} by card`, series: [{ points: pts }], takeaway: `${Math.round(pts[0].share * 100)}% on ${pts[0].label}` });
+        const byType = q.intent === 'BY_TYPE', grp = {};
+        cur.forEach(t => { const c = D.card(t.cardId), k = byType ? c.type : t.cardId; grp[k] = (grp[k] || 0) + t.amount; });
+        const tot = Object.values(grp).reduce((a, b) => a + b, 0) || 1;
+        const pts = Object.entries(grp).sort((a, b) => b[1] - a[1]).map(([k, v], i) => ({ label: byType ? k : `••${D.card(k).last4} ${D.card(k).type}`, amount: v, display: money(v), share: v / tot, colorSlot: i + 1 }));
+        Object.assign(P, { series: [{ points: pts }], takeaway: pts.length ? `${pts[0].label} covers ${Math.round(pts[0].share * 100)}% of ${subj ? what.toLowerCase() : 'your'} spend` : 'No spending in this period' });
+      },
+      V6() {
+        const byType = q.by.type, buckets = [];
+        if (q.split === 'WEEK') for (let w = monday(r.a); w <= r.b; w = day(w, 7)) buckets.push({ label: md(w), a: w, b: day(w, 6), partial: day(w, 6) > TODAY });
+        else for (let m = som(r.a); m <= r.b; m = addM(m, 1)) buckets.push({ label: mon(m), a: m, b: day(addM(m, 1), -1), partial: addM(m, 1) > TODAY });
+        const keyOf = t => byType ? D.card(t.cardId).type : t.cardId;
+        const groups = [...new Set(cur.map(keyOf))];
+        const totals = groups.map(g => [g, sum(cur.filter(t => keyOf(t) === g))]).sort((a, b) => b[1] - a[1]);
+        const series = totals.map(([g], i) => ({ label: byType ? g : `••${D.card(g).last4} ${D.card(g).type}`, colorSlot: i + 1,
+          points: buckets.map(b => ({ label: b.label, amount: sum(pick(b.a, b.b).filter(t => keyOf(t) === g)), partial: b.partial })) }));
+        const all = totals.reduce((n, x) => n + x[1], 0) || 1;
+        Object.assign(P, { series, takeaway: totals.length ? `${series[0].label} covers ${Math.round(totals[0][1] / all * 100)}% of ${subj ? what.toLowerCase() : 'your'} spend, ${per}` : 'No spending in this period' });
       },
       V7() {
         const by = {}; cur.forEach(t => { const k = q.intent === 'TOP' ? t.merchant : t.category; by[k] = (by[k] || 0) + t.amount; });
         const s = Object.entries(by).sort((a, b) => b[1] - a[1]);
-        const pts = s.slice(0, 5).map(([label, amount], i) => ({ label, amount, display: money(amount), colorSlot: 0 }));
+        const merchantsView = q.intent === 'TOP';
+        const inside = k => cur.filter(t => (merchantsView ? t.merchant : t.category) === k).slice(0, 6).map(t => ({ label: t.merchant, display: money(t.amount), when: `${md(t.date)} · ${t.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · ••${D.card(t.cardId).last4}` }));
+        const pts = s.slice(0, 5).map(([label, amount], i) => ({ label, amount, display: money(amount), colorSlot: i === 0 ? 0 : -1, logo: merchantsView, inside: inside(label) }));
         const other = s.slice(5).reduce((n, x) => n + x[1], 0);
-        if (other > 0) pts.push({ label: 'Other', amount: other, display: money(other), colorSlot: -1 });
-        Object.assign(P, { title: q.intent === 'TOP' ? 'Top merchants' : 'Where it went', series: [{ points: pts }], hero: { display: money(total) },
-          takeaway: `${pts[0].label} leads with ${Math.round(pts[0].amount / total * 100)}%` });
+        if (other > 0) pts.push({ label: 'Other', amount: other, display: money(other), colorSlot: -1, other: true, count: s.length - 5 });
+        Object.assign(P, { title: q.intent === 'TOP' ? (subj && subj.kind === 'category' ? `Top ${subj.name} merchants` : 'Top merchants') : 'Where it went', series: [{ points: pts }], takeaway: pts.length ? `${pts[0].label} is your top ${merchantsView ? 'merchant' : 'category'} at ${pts[0].display}` : 'No spending in this period' });
       },
       V8() {
-        const pts = cats.slice(0, 4).map(([label, amount], i) => ({ label, amount, display: money(amount), colorSlot: i + 1 }));
-        const other = cats.slice(4).reduce((n, x) => n + x[1], 0);
-        if (other > 0) pts.push({ label: 'Other', amount: other, display: money(other), colorSlot: -1 });
-        Object.assign(P, { title: 'Where it went', series: [{ points: pts }], hero: { display: money(total) }, takeaway: `${pts[0].label} is ${Math.round(pts[0].amount / total * 100)}% of the total` });
+        // A share is always of the whole: every category, with the one asked about called out.
+        const all = {}; pick(r.a, r.b, null).forEach(t => (all[t.category] = (all[t.category] || 0) + t.amount));
+        const whole = Object.entries(all).sort((a, b) => b[1] - a[1]), tot = whole.reduce((n, x) => n + x[1], 0) || 1;
+        const pts = whole.slice(0, 4).map(([label, amount], i) => ({ label, amount, display: money(amount), pct: Math.round(amount / tot * 100) + '%', colorSlot: i + 1 }));
+        const other = whole.slice(4).reduce((n, x) => n + x[1], 0);
+        if (other > 0) pts.push({ label: 'Other', amount: other, display: money(other), pct: Math.round(other / tot * 100) + '%', colorSlot: -1 });
+        const focus = subj && subj.kind === 'category' ? subj.name : pts[0].label, fp = Math.round((all[focus] || 0) / tot * 100);
+        Object.assign(P, { series: [{ points: pts }], hero: { display: money(tot) }, focus, takeaway: `${focus} is ${fp}% of your spend` });
       },
       V9() {
         const spent = sum(base.filter(t => inR(t, som(TODAY), TODAY) && t.cardId === card.id));
@@ -245,9 +310,28 @@
       },
     };
     V[P.visual]();
+    P.partial = !!r.partial;
+    const Subj = subj ? subj.name : null;
+    const TITLE = {
+      V1: `${Subj || 'All spend'} · ${per}`, V2: `${q.subjects.slice(0, 2).map(x => x.name).join(' vs ')} · ${per}`,
+      V3: `${Subj || 'All spend'} · ${q.split === 'WEEK' ? 'by week' : per}`, V5: `${Subj ? Subj + ' · ' : ''}${q.intent === 'BY_TYPE' ? 'Debit vs credit' : 'By card'} · ${per}`,
+      V6: `${Subj ? Subj + ' · ' : ''}${q.by && q.by.type ? 'Debit vs credit' : 'By card'} · ${per}`, V7: q.intent === 'TOP' ? `${Subj ? Subj + ' · merchants' : 'Top merchants'} · ${per}` : `Top categories · ${per}`,
+      V8: `Spend by category · ${per}`, V11: `What changed · ${per}`, V12: `${Subj || 'All spend'} · by weekday`, V21: 'Unusual activity', V14: 'Subscriptions & bills',
+    };
+    if (TITLE[P.visual]) P.title = TITLE[P.visual];
+    if (!/Last 8 weeks|Last 14 days|Seen 3\+|vs /.test(P.footer)) P.footer = `${Subj && P.visual !== 'V2' ? Subj + ' · ' : ''}${md(r.a)}–${r.a.getMonth() === r.b.getMonth() ? r.b.getDate() : md(r.b)}${r.partial ? ' · so far' : ''} · ${scopeLbl}`;
     P.answer = P.takeaway;
     return P;
   }
 
-  window.Insights = { read, choose, build, money };
+  // Several subjects with a split → one page per subject, same view on each (max 3).
+  function buildAll(text, scope) {
+    const q = read(text);
+    if (q.subjects.length > 1 && ['STACK', 'BY_TYPE', 'BY_CARD', 'TREND', 'TOP'].includes(q.intent)) {
+      return q.subjects.slice(0, 3).map(sj => build(text, scope, sj));
+    }
+    return [build(text, scope)];
+  }
+
+  window.Insights = { read, choose, build, buildAll, money };
 })();

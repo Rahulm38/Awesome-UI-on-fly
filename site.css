@@ -472,3 +472,15 @@ a { color: inherit; }
 body.sim-outage .ph .r .tg:not(.tg-out) { color: var(--warn); }
 body.sim-outage #flow .node.switchable:not(.off) rect.bg { stroke: var(--warn); stroke-dasharray: 3 3; }
 body.sim-outage #flow .node.switchable:not(.off) .s { fill: var(--warn); }
+
+/* fallback classifier: which patterns fired */
+.rules-view { margin-top: 8px; border: 1px dashed #facc1555; border-radius: 4px; background: #facc1506; padding: 8px 10px; font-family: var(--mono); }
+.rv-h { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #fde047cc; margin-bottom: 6px; }
+.rv-row { display: grid; grid-template-columns: 140px 1fr 56px; gap: 10px; align-items: baseline; font-size: 11.5px; color: #9fb3b8; padding: 4px 0; border-bottom: 1px dashed #ffffff0d; }
+.rv-row b { color: #e6f6f8; font-weight: 600; } .rv-row em { font-style: normal; text-align: right; color: #fde047; }
+.rv-row.win b { color: #4ade80; } .rv-row.win em { color: #4ade80; }
+.rv-note { margin-top: 6px; font-size: 10.5px; color: #6b8187; }
+@media (max-width: 760px) { .rv-row { grid-template-columns: 1fr 50px; } .rv-row span { grid-column: 1 / -1; order: 3; } }
+
+/* narration only while something is happening */
+.flow-say:has(span:empty) { display: none; }

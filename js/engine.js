@@ -164,7 +164,10 @@
 
   function splitParts(text) {
     const parts = text.split(/\s*(?:,\s*)?\b(?:and then|and also|then|and)\b\s*|\s*;\s*/i).map(s => s.trim()).filter(Boolean);
-    return parts.length > 1 && parts.every(p => Jev.strength(p) >= 2.5) ? parts : [text];
+    if (parts.length < 2 || !parts.every(p => Jev.strength(p) >= 2.5)) return [text];
+    // Only a request that changes something is split; "food by month and by card" is one question.
+    const acts = parts.filter(p => { const d = Jev.decide(p, { strict: true }); return d.top && KINDS[d.top.id] && !KINDS[d.top.id].read; });
+    return acts.length ? parts : [text];
   }
 
   // ── insights: a warm in-memory snapshot + a pure chart builder ─────────
@@ -185,7 +188,7 @@
     if (SNAP.at && age < SNAP.STALE) { loadSnapshot(null, 'refresh in background'); return { cache: 'stale-served', age }; }
     await loadSnapshot(trace, 'cold start'); return { cache: 'miss' };
   }
-  const SPENDY = /\b(spend|spent|spending|how much|money|where did|breakdown|subscriptions?|recurring|unusual|strange|suspicious|limit left|left to spend|how often|which days?|weekday|weekend|compare|vs|versus|top|biggest|trend|per (week|month)|changed|usual|normal|a lot|on track|pace|by card)\b/i;
+  const SPENDY = /\b(spend|spent|spending|how much|money|merch\w*|merhc\w*|where did|breakdown|subscriptions?|recurring|unusual|strange|suspicious|limit left|left to spend|how often|which days?|weekday|weekend|compare|vs|versus|top|biggest|trend|per (week|month)|changed|usual|normal|a lot|on track|pace|by card)\b/i;
   const chartCache = new Map(); // text|card → { panel, at }, kept 60 s so the sent answer reuses the typed numbers
   async function insight(trace, text, ctx, typing) {
     return span(trace, 'insight', typing ? 'Insights · preview' : 'Insights · build', { text, scope: ctxOf(ctx) }, () => null, [1, 3]).then(async () => {
@@ -194,7 +197,7 @@
       if (!typing && hit && Date.now() - hit.at < 60e3) { log(`chart reused from the typing cache (${Math.round((Date.now() - hit.at) / 1000)} s old) — same numbers you saw while typing`, 'ok'); return { panel: hit.panel, cache: 'typing-cache', ms: 'typed' }; }
       const snap = await snapshot(trace);
       const t0 = performance.now();
-      const panel = await span(trace, 'insight', 'Insights · choose + draw', { read: Insights.read(text), snapshot: snap.cache }, () => Insights.build(text, ctx), [3, 11]);
+      const panel = await span(trace, 'insight', 'Insights · choose + draw', { read: Insights.read(text), snapshot: snap.cache }, () => { const ps = Insights.buildAll(text, ctx); Object.defineProperty(ps[0], 'pages', { value: ps, enumerable: false }); return ps[0]; }, [3, 11]);
       chartCache.set(key, { panel, at: Date.now() });
       return { panel, cache: snap.cache, ms: Math.round(performance.now() - t0) };
     });
@@ -367,7 +370,8 @@
   // ── UI composer: results → blocks the phone knows how to draw ────────────
   function title(item, past) {
     const c = item.res && item.res.cards, p = item.params;
-    const who = p.allCards ? (c ? `all ${c.length} eligible card${c.length > 1 ? 's' : ''}` : 'all your cards') : c ? D.tag(c[0]) : 'your card';
+    const named = !c && (item.cardOverride || p.cardId || item.carried);
+    const who = p.allCards ? (c ? `all ${c.length} eligible card${c.length > 1 ? 's' : ''}` : 'all your cards') : c ? D.tag(c[0]) : named ? D.tag(D.card(named)) : 'your card';
     return {
       FREEZE: [`Freeze ${who}?`, `Froze ${who}`], UNFREEZE: [`Unfreeze ${who}?`, `Unfroze ${who}`],
       SET_LIMIT: [`Limit ${who}`, `${who} limit set to ${p.amount && money(p.amount)}`],
@@ -404,7 +408,11 @@
       case 'done': return { state: 'DONE', title: title(it, true), detail: 'Confirmed by the bank just now' + (r.actionId ? ' · undo for 30 min' : ''),
         actions: r.actionId ? [{ label: 'Undo', turn: { undo: r.actionId, display: 'Undo' } }] : [] };
       case 'undone': return { state: 'UNDONE', title: 'Undone: ' + title(it, true), detail: 'Reverted and confirmed by the bank' };
-      case 'failed': return { state: 'FAILED', title: it && it.kind ? title(it) : 'Couldn’t do that', detail: r.reason };
+      case 'failed': {
+        // Name what didn't happen, then why — never a question on a failed row.
+        const m = /^(.+?): (.+)$/.exec(r.reason || '');
+        return { state: 'FAILED', title: it && it.kind ? `${KINDS[it.kind].label} · not done` : 'Couldn’t do that', detail: m ? `${m[1]} — ${m[2].charAt(0).toLowerCase()}${m[2].slice(1)}` : r.reason };
+      }
       case 'cancelled': return { state: 'UNSUPPORTED', title: 'Cancelled', detail: 'Nothing was changed' };
       case 'waiting': return { state: 'WAITING', title: it.kind ? title(it) : it.text, detail: 'Next, after the step above' };
       case 'ask': {
@@ -441,7 +449,6 @@
       switch (r.t) {
         case 'insight': {
           out.push({ type: 'CHART', panel: r.panel, built: r.built });
-          out.push({ type: 'ANSWER', text: r.panel.answer });
           const f = FOLLOW[r.panel.visual]; if (f) out.push({ type: 'FOLLOW', chips: f.map(l => ({ label: l, turn: { text: l } })) });
           break;
         }
@@ -451,7 +458,7 @@
         case 'candidates': out.push({ type: 'CHIPS', question: 'Did you mean…', chips: r.d.candidates.map(c => ({ label: c.label, turn: { text: c.label } })) }); break;
         case 'ambiguous': out.push({ type: 'CHIPS', question: 'Do you want to…', chips: ['Turn off ATM withdrawals', 'Find an ATM near me'].map(l => ({ label: l, turn: { text: l } })) }); break;
         case 'unsupported': out.push({ type: 'ANSWER', text: 'That’s not something I can do. I can freeze or unfreeze cards, set limits, block merchants, set up travel, dispute charges and show your spending.' }); break;
-        case 'none': out.push({ type: 'CHIPS', question: 'I didn’t catch that. Try one of these:', chips: ['How much did I spend this month?', 'Freeze my card', 'Set a limit'].map(l => ({ label: l, turn: { text: l } })) }); break;
+        case 'none': out.push({ type: 'CHIPS', question: r.d && r.d.greeting ? 'Hi! Ask about your spending or tell me what to change on a card — for example:' : 'I didn’t catch that. Try one of these:', chips: ['How much did I spend this month?', 'Freeze my card', 'Set a limit'].map(l => ({ label: l, turn: { text: l } })) }); break;
         case 'ask': { const inter = interaction(r); if (inter) out.push(inter); else out.push({ type: 'STATUS', rows: [row(r)] }); break; }
         default: out.push({ type: 'STATUS', rows: [row(r)] });
       }

@@ -14,7 +14,7 @@
     if (inflight >= 2) { log('2 keystroke requests already in flight — this one waits for the next pause', 'dim'); clearTimeout(deb); deb = setTimeout(() => ask(input.value), 150); return; }
     const my = ++seq; inflight++;
     let r;
-    try { r = await intent(text, Phone.ctx, replaying); } finally { inflight--; }
+    try { r = await intent(Correct.fix(text).text, Phone.ctx, replaying); } finally { inflight--; }
     if (my !== seq || input.value !== text) { log(`dropped stale answer #${my} (“${text}”) — ${my !== seq ? 'a newer one exists' : 'text changed since'}`, 'dim'); return; }
     if (r.outage) { if (r.limited) { Phone.tray(null); return; } log(r.off ? 'Jev is off → no tray. The LLM and rules never answer keystrokes: absent beats slow or blunt.' : 'Jev unavailable → no tray. The LLM and rules never answer keystrokes: absent beats slow or blunt.', 'warn'); setTimeout(() => { if (my === seq) Phone.tray(null); }, 1500); return; }
     Engine.showDecision(r.decision, text, r.presentation);
@@ -33,7 +33,7 @@
   async function previewOnly(text) {
     const my = ++seq;
     if (text.trim().length < 3) { Phone.tray(null); return; }
-    const panel = await Engine.preview(text, Phone.ctx);
+    const panel = await Engine.preview(Correct.fix(text).text, Phone.ctx);
     if (my !== seq || input.value !== text) return;
     if (!panel) { Phone.tray(null); shown = null; return; }
     if (shown && shown !== panel.visual && !/\s$/.test(text) && performance.now() - lastKey < 600) {
@@ -44,6 +44,11 @@
   }
 
   input.addEventListener('input', e => {
+    if (e.isTrusted && / $/.test(input.value)) {
+      const m = input.value.match(/(\S+) $/), w = m && m[1].replace(/[^A-Za-z’']/g, '');
+      const c = w && Correct.word(w);
+      if (c && c !== w) { input.value = input.value.slice(0, -1 - m[1].length) + m[1].replace(w, c) + ' '; log(`autocorrect: ${w} → ${c}`, 'dim'); }
+    }
     if (e.isTrusted) replaying = false;   // a real keystroke makes it a live call
     lastKey = performance.now();
     if (!live) {
@@ -79,7 +84,7 @@
     replaying = false; heard = '';
     rec = new SR();
     rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
-    rec.onstart = () => { trail.classList.add('listening'); input.placeholder = 'Listening…'; log('voice: listening (browser speech recognition)', 'dim'); };
+    rec.onstart = () => { mic.classList.add('listening'); input.placeholder = 'Listening…'; log('voice: listening (browser speech recognition)', 'dim'); };
     rec.onresult = e => {
       heard = [...e.results].map(r => r[0].transcript).join('').trim();
       input.value = heard; input.dispatchEvent(new Event('input'));
@@ -91,28 +96,27 @@
       log(`voice: ${e.error}`, 'warn');
     };
     rec.onend = () => {
-      trail.classList.remove('listening'); input.placeholder = 'Ask Nova…'; rec = null;
-      if (heard && !busy) { log(`voice: heard “${heard}” → sent as a LIVE turn`, 'ok'); Phone.clearInput(); Phone.user(heard); send({ text: heard, replay: false }); }
+      mic.classList.remove('listening'); input.placeholder = 'Ask Nova…'; rec = null;
+      if (heard && !busy) { const cr = Correct.fix(heard); log(`voice: heard “${heard}”${cr.changes.length ? ` → corrected to “${cr.text}”` : ''} → sent as a LIVE turn`, 'ok'); Phone.clearInput(); Phone.user(cr.text, cr.changes); send({ text: cr.text, replay: false }); }
     };
     try { rec.start(); } catch (err) { log('voice: could not start — ' + err.message, 'warn'); }
   }
-  trail.addEventListener('click', e => {
-    if (rec) { e.preventDefault(); stopVoice(); return; }
-    if (!input.value.trim()) { e.preventDefault(); startVoice(); }
-  });
-  trail.setAttribute('aria-label', 'Send, or speak when empty');
+  // Like the app: mic on the left, send on the right.
+  const mic = $('#mic');
+  mic.addEventListener('click', () => { if (rec) stopVoice(); else startVoice(); });
 
   form.addEventListener('submit', e => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text || busy) return;
-    Phone.clearInput(); Phone.user(text); send({ text, replay: replaying });
+    const cr = Correct.fix(text); if (cr.changes.length) log(`autocorrect: ${cr.changes.map(c => c.join(' → ')).join(', ')}`, 'dim');
+    Phone.clearInput(); Phone.user(cr.text, cr.changes); send({ text: cr.text, replay: replaying });
     replaying = false;
   });
 
   Phone.on.send = turn => send({ replay: true, ...turn });
   // A tray tap composes an ordinary turn: the person's own words + the card they picked.
-  Phone.on.commit = extra => { const text = input.value.trim(); if (!text) return; Phone.clearInput(); Phone.user(text); send({ text, replay: replaying, ...extra }); replaying = false; };
+  Phone.on.commit = extra => { const raw = input.value.trim(); if (!raw) return; const cr = Correct.fix(raw); Phone.clearInput(); Phone.user(cr.text, cr.changes); send({ text: cr.text, replay: replaying, ...extra }); replaying = false; };
   // Picking a "did you mean" row re-asks with that row's label — one way to build a tray, not two.
   Phone.on.reask = label => { input.value = label; input.dispatchEvent(new Event('input')); clearTimeout(deb); ask(label); };
   Phone.on.context = () => { bus.emit('scope'); log(`card scope → ${Phone.ctx.cardId ? NovaData.tag(NovaData.card(Phone.ctx.cardId)) : 'All cards'}`); if (live && input.value.trim()) ask(input.value); };
@@ -135,7 +139,7 @@
   // Tabs → groups → questions. Each row shows the question it will ask and, on the right, what you'll get.
   const Q = (q, k, text, say, extra = {}) => ({ q, k, text, say, ...extra });
   const GROUPS = [
-    ['Instant charts', 'Ask about money · a chart is chosen from the data', [
+    ['Instant charts', 'a chart per question', [
       ['How much?', [
         Q('How much on food last month?', 'number', 'how much did I spend on food last month', 'One number · change chip · 6-month sparkline', { tag: 'V1' }),
         Q('Food vs transport?', 'face-off', 'food vs transport this month', 'Two subjects side by side', { tag: 'V2' }),
@@ -153,13 +157,19 @@
         Q('This month vs last?', 'pace line', 'how does this month compare with last month', 'Cumulative pace · this month vs last', { tag: 'V10' }),
         Q('What changed this month?', 'up / down', 'what changed this month', '↑↓ by category vs same days last month', { tag: 'V11' }),
       ]],
+      ['Split & compare', [
+        Q('Food by card, last 3 months?', 'stacked', 'split food by month and by card', 'One view: months as columns, each card a colour · this month hatched', { tag: 'V6' }),
+        Q('Food: debit vs credit, 3 weeks?', 'split bar', 'what are my food spend by last 3 weeks compare across cards split by type', 'Short window → one split bar, debit vs credit', { tag: 'V5' }),
+        Q('Split food by merchant', 'tap to drill', 'split food by merchant', 'Ranked merchants with logos · tap one to see its payments', { tag: 'V7' }),
+        Q('Fuel vs food, debit vs credit?', '2 pages', 'compare my fuel with food last 3 months split by debit and credit', 'Two subjects → one page each · swipe or tap the dots', { tag: 'V6 ×2' }),
+      ]],
       ['Watch-outs', [
         Q('Anything unusual?', 'alerts', 'anything unusual', '> 3× a merchant’s usual · or “nothing unusual”', { tag: 'V21' }),
         Q('My subscriptions?', 'list', 'show my subscriptions', 'Recurring · 3+ months in a row', { tag: 'V14' }),
         Q('How often at Brewline?', 'visits', 'how often do I go to brewline', 'Visits per week · last visit', { tag: 'V13' }),
       ]],
     ]],
-    ['Multi-step stories', 'Real conversations · several turns, taps and confirms', [
+    ['Multi-step stories', 'several turns and taps', [
       ['Money checks', [
         Q('Budget reset', '4 steps', '', 'pace → what changed → set a limit → limit meter', { steps: [
           { say: 'how does this month compare with last month', note: 'pace vs last month' },
@@ -199,7 +209,7 @@
           { tap: '$500', note: 'missing amount filled · plan resumes' } ] }),
       ]],
     ]],
-    ['Safe card actions', 'Change a card · gate → confirm → read-back → undo', [
+    ['Safe card actions', 'gate · confirm · undo', [
       ['Everyday', [
         Q('Freeze my card and block Zipride', '2 steps', 'freeze my everyday card and block zipride', '2 parts → 2 rows · card carried over'),
         Q('Set a limit on my everyday card', 'asks amount', 'set a limit on my everyday card', 'Missing amount → chips → resumes'),
@@ -211,7 +221,7 @@
         Q('I don’t recognise a charge', 'dispute', 'I don’t recognise the Streamly charge', 'Card from the transaction · confirm'),
       ]],
     ]],
-    ['Before you send', 'Jev reads each keystroke · UI appears before send', [
+    ['Before you send', 'Jev per keystroke', [
       ['Before you send', [
         Q('freeze my card', 'action tray', 'freeze my card', 'Tray before send · pick card · Do it', { live: true, stay: true }),
         Q('where did my money go', 'live chart', 'where did my money go', 'Live chart preview · cached 60 s for send', { live: true, stay: true }),

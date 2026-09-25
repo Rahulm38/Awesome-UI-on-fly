@@ -52,9 +52,12 @@
     ['RAISE_DISPUTE', /\b(dispute|fraud\w*|unauthori[sz]ed)\b|didn'?t (make|buy|order)|don'?t recogni[sz]e|charged twice|wrong (charge|amount)/, 3.2],
     ['SPEND_INSIGHT', /\b(spend|spent|spending|expenses?|breakdown)\b|how much|money (go|went)/, 3],
     ['SPEND_INSIGHT', /\b(subscriptions?|recurring|unusual|suspicious|strange|how often|which days?|weekdays?|top merchants|biggest|trend|what changed|on track|by card|by week|by month)\b|is (that|this|it) a lot|compare|\bvs\b/, 3.2],
+    ['SPEND_INSIGHT', /\bsplit\b|\bby merchants?\b|\bmerchants?\b|\bby (card|category|categories|type)\b/, 3],
+    ['SPEND_INSIGHT', /\b(food|dining|groceries|grocery|transport|fuel|petrol|gas|shopping|entertainment|health|pharmacy|utilities|bills|household|salon|education|pets?|gifts?|coffee|flights?)\b.*\b(last|this|past)\s+(\d+\s+|one |two |three |six )?(week|month|day|year)s?\b/, 3],
+    ['SPEND_INSIGHT', /\b(block|unblock|stop|ban)\b/, -3],
     ['SPEND_INSIGHT', /\blimit\b.*\b(left|remaining|used)\b|\b(left|remaining)\b.*\blimit\b|left to spend/, 5],
     ['SET_LIMIT', /\blimit\b.*\b(left|remaining|used)\b|\b(left|remaining)\b.*\blimit\b/, -3],
-    ['SPEND_INSIGHT', /\b(food|dining|eating|groceries|grocery|transport|rides|shopping|entertainment|streaming)\b/, 0.4],
+    ['SPEND_INSIGHT', /\b(food|dining|eating|groceries|grocery|transport|rides|shopping|entertainment|streaming|health|pharmacy|utilities|bills|household|salon|education|pets?|gifts?)\b/, 0.4],
     ['VIEW_TRANSACTIONS', /\b(transactions?|statements?|history|purchases)\b/, 2.6],
     ['VIEW_REWARDS', /\b(rewards?|points|cashback)\b/, 3],
   ];
@@ -76,7 +79,7 @@
 
   function rawScores(text, strict) {
     // A card's name is a name, not an intent: “my travel card” says nothing about travelling.
-    const t = norm(text).replace(/\b(travel|everyday|virtual) card\b/g, 'card'), raw = {}, fired = [];
+    const t = norm(text).replace(/\b(travel|everyday|virtual|rewards|family|premier) card\b/g, 'card'), raw = {}, fired = [];
     const add = (k, w, why) => { raw[k] = (raw[k] || 0) + w; fired.push(`${k} ${w > 0 ? '+' : ''}${w} ← ${why}`); };
     for (const [k, re, w] of FEATURES) { const m = t.match(re); if (m) add(k, w, `"${m[0]}"`); }
 
@@ -105,7 +108,8 @@
     const bestKind = scores.find(s => s.type === 'kind');
     const bestHand = scores.find(s => s.type === 'handoff');
     const nWords = t.trim().split(' ').filter(Boolean).length;
-    const generic = !Object.values(raw).some(v => v > 0) && nWords >= 2;
+    const greeting = /^(hi|hello|hey|hiya|good (morning|afternoon|evening)|thanks|thank you|ok|okay)\b/.test(t.trim()) && !Object.values(raw).some(v => v > 0);
+    const generic = !greeting && !Object.values(raw).some(v => v > 0) && nWords >= 2;
     const route = { IN_SCOPE: bestKind.p, OUT_OF_SCOPE: Math.max(bestHand.p, generic ? 0.86 : 0.04) };
     const bar = s => (s.highStakes ? T.highStakes : T.act);
     // A single reading only wins when no rival is close behind it; a near tie is a question, not an answer.
@@ -135,7 +139,7 @@
       }
     }
     return { verdict, top, candidates, route: { IN_SCOPE: round(route.IN_SCOPE), OUT_OF_SCOPE: round(route.OUT_OF_SCOPE) },
-      reason, scores, features: fired, source: opts.strict ? 'rules' : 'jev' };
+      reason: greeting ? 'a greeting, not a request' : reason, greeting, scores, features: fired, source: opts.strict ? 'rules' : 'jev' };
   }
 
   // Strongest single feature weight — used to decide whether a message has more than one request in it.
