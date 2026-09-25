@@ -201,7 +201,7 @@
     const best = top || d.scores.find(x => x.type === 'kind'), runner = ranked[0];
     const lead = best && runner ? +(best.p - runner.p).toFixed(2) : null;
     let si = 0;
-    const ok = (c, text) => `<li class="${c ? 'y' : 'n'}" style="animation-delay:${(si++) * 160}ms"><i>${c ? '✓' : '✕'}</i>${text}</li>`;
+    const ok = (c, text) => `<li class="${c ? 'y' : 'n'}" style="animation-delay:${(si++) * 160}ms"><i>${Icon(c ? 'check' : 'x', 12)}</i>${text}</li>`;
     const steps = [
       ok(d.route.IN_SCOPE >= d.route.OUT_OF_SCOPE, `route · in ${d.route.IN_SCOPE.toFixed(2)} ${d.route.IN_SCOPE >= d.route.OUT_OF_SCOPE ? '≥' : '<'} out ${d.route.OUT_OF_SCOPE.toFixed(2)}`),
       best ? ok(best.p >= barOf(best), `${best.id} ${best.p.toFixed(2)} ${best.p >= barOf(best) ? '≥' : '<'} bar ${barOf(best).toFixed(2)}${best.highStakes ? ' (high stakes)' : ''}`) : '',
@@ -216,7 +216,7 @@
       <div class="call-h"><span class="verb">POST</span><span>/v1/${src === 'jev' ? 'jev/decide' : src === 'llm' ? 'llm/decide' : 'rules/decide'}</span><span class="mode ${trace && trace.replay ? 'rec' : 'live'}">${trace && trace.replay ? 'RECORDED' : 'LIVE'}</span>
         <span class="st ${js && js.status !== 'ok' ? 'bad' : ''}">${js ? (js.status === 'ok' ? '200' : '504') : '200'}</span><span class="lat">${js ? Math.round(js.dur) + ' ms' : '—'}</span></div>
       <div class="call-b"><div><small>request</small><pre>${esc(compact(req))}</pre></div><div><small>response</small><pre>${esc(compact(res))}</pre></div></div>
-      <div class="sel"><small>selection</small><ol>${steps}</ol><div class="choice-line" style="animation-delay:${si * 160 + 80}ms">choice → <b class="${choice ? '' : 'null'}">${choice || 'null'}</b>${choice ? '' : ` <em>· ${d.verdict.toLowerCase()}</em>`}</div></div>
+      <div class="call-sel"><small>selection</small><ol>${steps}</ol><div class="choice-line" style="animation-delay:${si * 160 + 80}ms">choice → <b class="${choice ? '' : 'null'}">${choice || 'null'}</b>${choice ? '' : ` <em>· ${d.verdict.toLowerCase()}</em>`}</div></div>
     </div>`;
     // When Jev isn't the one deciding, show how the fallback pattern-matcher got there.
     let body = `<div class="srs">${rows}</div>`;

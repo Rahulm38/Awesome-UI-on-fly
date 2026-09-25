@@ -64,13 +64,13 @@
   $('#card-chip').onclick = () => {
     const vis = D.cards.filter(c => !c.archived);
     openSheet('Select Card', `
-      <button class="pick" data-id=""><span class="all">${allArt(18)}</span><div><b>All Cards</b><small>${vis.length} cards</small></div>${!Phone.ctx.cardId ? '<span class="ok">✓</span>' : ''}</button>
+      <button class="pick" data-id=""><span class="all">${allArt(18)}</span><div><b>All Cards</b><small>${vis.length} cards</small></div>${!Phone.ctx.cardId ? `<span class="ok">${Icon('check', 18)}</span>` : ''}</button>
       <div class="lbl-s">Cards</div>
-      ${vis.map(c => `<button class="pick" data-id="${c.id}">${art(c, 32)}<div><b>${esc(c.name)}</b><small>${cardSub(c)}</small></div>${Phone.ctx.cardId === c.id ? '<span class="ok">✓</span>' : ''}</button>`).join('')}`);
+      ${vis.map(c => `<button class="pick" data-id="${c.id}">${art(c, 32)}<div><b>${esc(c.name)}</b><small>${cardSub(c)}</small></div>${Phone.ctx.cardId === c.id ? `<span class="ok">${Icon('check', 18)}</span>` : ''}</button>`).join('')}`);
     picker.querySelectorAll('.pick').forEach(b => b.onclick = () => { Phone.ctx.cardId = b.dataset.id || null; picker.hidden = true; Phone.renderCards(); Phone.on.context && Phone.on.context(); });
   };
   $('#activity').onclick = () => {
-    openSheet('What Nova changed', changes.length ? changes.map(x => `<div class="pick"><span class="all">✓</span><div><b>${esc(x.title)}</b><small>${x.at} · undo within 30 min</small></div></div>`).join('')
+    openSheet('What Nova changed', changes.length ? changes.map(x => `<div class="pick"><span class="all">${Icon('check', 16)}</span><div><b>${esc(x.title)}</b><small>${x.at} · undo within 30 min</small></div></div>`).join('')
       : '<p class="greet-sub" style="padding:8px 4px 16px">Nothing yet. Every change Nova makes is listed here for 24 hours.</p>');
     $('#badge').textContent = '';
   };
@@ -105,7 +105,7 @@
   };
   Phone.toast = text => { const t = el('div', 'toast', esc(text)); $('.screen').appendChild(t); setTimeout(() => t.remove(), 2400); };
 
-  const ICON = { DONE: '✓', FAILED: '✕', NEEDS_CONFIRM: '!', NEEDS_INPUT: '○', WAITING: '○', UNSUPPORTED: '–', UNDONE: '↺' };
+  const ICON = { DONE: 'check', FAILED: 'x', NEEDS_CONFIRM: 'alert', NEEDS_INPUT: 'circle', WAITING: 'circle', UNSUPPORTED: 'minus', UNDONE: 'undo' };
   const act = (a, off) => { const b = el('button', 'act' + (a.primary ? ' primary' : ''), esc(a.label)); b.onclick = () => { off(); Phone.user(a.turn.display || a.label); Phone.on.send(a.turn); }; return b; };
 
   const DRAW = {
@@ -122,7 +122,7 @@
     STATUS(b, off) {
       const box = el('div', 'status');
       b.rows.forEach(r => {
-        const line = el('div', 'row ' + (ICON[r.state] ? r.state.toLowerCase() : 'neutral'), `<span class="ic">${ICON[r.state] || '•'}</span><div><b>${esc(r.title)}</b>${r.detail ? `<small>${esc(r.detail)}</small>` : ''}</div>`);
+        const line = el('div', 'row ' + (ICON[r.state] ? r.state.toLowerCase() : 'neutral'), `<span class="ic">${Icon(ICON[r.state] || 'minus', 14)}</span><div><b>${esc(r.title)}</b>${r.detail ? `<small>${esc(r.detail)}</small>` : ''}</div>`);
         if (r.actions && r.actions.length) { const a = el('div', 'acts'); r.actions.forEach(x => a.appendChild(act(x, off))); line.appendChild(a); }
         box.appendChild(line);
       });
@@ -156,17 +156,23 @@
 
   // ── action tray: above the input while typing. It never writes anything;
   //    every tap composes an ordinary turn down the same path as send. ─────
+  // "Tap to send" hint: only the first 2 times the tap-to-send card appears.
+  const TAP_KEY = 'nova-tap-hint';
+  const tapSeen = () => { try { return +localStorage.getItem(TAP_KEY) || 0; } catch (e) { return 0; } };
+  const tapCount = n => { try { localStorage.setItem(TAP_KEY, String(n)); } catch (e) { /* private mode: hint just shows */ } };
+
   Phone.tray = pres => {
-    tray.innerHTML = '';
+    const wasTap = tray.dataset.tap === '1';
+    tray.innerHTML = ''; tray.dataset.tap = '';
     if (!pres || pres.type === 'NONE' || (pres.type === 'READ' && !pres.panel)) { tray.hidden = true; return; }
     tray.hidden = false;
     const commit = extra => { tray.hidden = true; Phone.on.commit(extra || {}); };
     const pct = () => '';   // scores belong to the Decision tab, not the product UI
-    const GO = '<span class="go">›</span>';
+    const GO = `<span class="go">${Icon('chevron-right', 16)}</span>`;
 
     if (pres.type === 'CANDIDATES') {
       tray.appendChild(el('div', 'tray-h', 'Did you mean'));
-      pres.items.forEach(c => { const r = el('button', 'tray-row', `<span class="ti">${c.icon}</span><span>${esc(c.label)}</span>${pct(c.p)}${GO}`); r.onclick = () => Phone.on.reask(c.label); tray.appendChild(r); });
+      pres.items.forEach(c => { const r = el('button', 'tray-row', `<span class="ti">${Icon(c.icon, 18)}</span><span>${esc(c.label)}</span>${pct(c.p)}${GO}`); r.onclick = () => Phone.on.reask(c.label); tray.appendChild(r); });
       return;
     }
     if (pres.type === 'READ') {
@@ -174,15 +180,18 @@
       const card = Charts.renderDeck(pres.panel.pages || [pres.panel], true);
       card.classList.add('tap-send'); card.title = 'Send';
       card.addEventListener('click', e => { if (!e.target.closest('.ic-row, .ic-pager')) commit(); });
-      tray.appendChild(card); return;
+      tray.appendChild(card); tray.dataset.tap = '1';
+      if (!wasTap) { const n = tapSeen() + 1; tapCount(n); tray.dataset.hint = n <= 2 ? '1' : ''; }
+      if (tray.dataset.hint === '1') tray.appendChild(el('div', 'tap-hint', 'Tap to send'));
+      return;
     }
     if (pres.type === 'HANDOFF') {
-      const r = el('button', 'tray-row', `<span class="ti">${pres.icon}</span><span>${esc(pres.label)}<small>Opens ${esc(pres.screen)}</small></span>${pct(pres.p)}${GO}`);
+      const r = el('button', 'tray-row', `<span class="ti">${Icon(pres.icon, 18)}</span><span>${esc(pres.label)}<small>Opens ${esc(pres.screen)}</small></span>${pct(pres.p)}${GO}`);
       r.onclick = () => commit(); tray.appendChild(r); return;
     }
     const res = pres.res;
     const who = res.error ? res.error : res.allCards ? `All ${res.cards.length} eligible card${res.cards.length > 1 ? 's' : ''}` : res.cards ? D.tag(res.cards[0]) : 'Pick a card';
-    const head = el('div', 'tray-row static', `<span class="ti">${pres.icon}</span><span>${esc(pres.label)}<small>${esc(who)}</small></span>${pct(pres.p)}`);
+    const head = el('div', 'tray-row static', `<span class="ti">${Icon(pres.icon, 18)}</span><span>${esc(pres.label)}<small>${esc(who)}</small></span>${pct(pres.p)}`);
     tray.appendChild(head);
     if (res.error) return;
     const go = el('button', 'tray-go', pres.requiresFullConfirm ? 'Review' : 'Do it');

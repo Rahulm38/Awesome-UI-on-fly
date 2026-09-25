@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta property="og:title" content="Awesome UI on Fly · Architecture">
+  <meta property="og:title" content="Awesome UI on Fly · How it works">
   <meta property="og:image" content="og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Awesome UI on Fly · Architecture</title>
+  <title>Awesome UI on Fly · How it works</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230e7490%22/%3E%3Cpath fill=%22%23ecfeff%22 d=%22M13 6c.7 5.8 3.4 8.5 9.2 9.2-5.8.7-8.5 3.4-9.2 9.2-.7-5.8-3.4-8.5-9.2-9.2 5.8-.7 8.5-3.4 9.2-9.2z%22/%3E%3C/svg%3E">
   <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="site.css?v=41">
+  <link rel="stylesheet" href="site.css?v=81">
   <style>
     .doc-wrap { max-width: 1040px; margin: 0 auto; padding: 8px 28px 48px; }
     .doc-wrap h1 { font: 600 clamp(24px, 2.6vw, 32px)/1.15 var(--display); letter-spacing: -.025em; margin: 28px 0 0; }
@@ -43,24 +43,34 @@
     .fig-live::after { display: none; }
     .fig-live .flow-wrap, .fig-live .flow-say { margin-left: 0; margin-right: 0; }
     .guards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+    .tscroll { border: 1px solid var(--border); border-radius: 8px; } .tscroll table { border: 0; border-radius: 0; }
+    .tscroll tr:last-child td { border-bottom: 0; }
+    @media (max-width: 760px) {
+      .doc-wrap { padding-left: 16px; padding-right: 16px; }
+      .tscroll table { min-width: 560px; }
+      .fig:not(.fig-live) { overflow-x: auto; padding: 12px; }
+      .fig:not(.fig-live) svg { min-width: 620px; }
+      .rules, .guards { grid-template-columns: 1fr; }
+      .doc-wrap h2 small { display: block; margin: 4px 0 0; }
+    }
   </style>
 </head>
 <body>
-  <header class="top"><div class="brand"><span class="mark" style="font-size:13px">✦</span><b>Awesome UI on Fly</b><span class="tagline">Architecture</span></div><a class="btn-ghost" href="index.html">← Live demo</a></header>
+  <header class="top"><a class="brand" href="index.html"><span class="mark"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M10 2.5c.5 4.4 2.6 6.5 7 7-4.4.5-6.5 2.6-7 7-.5-4.4-2.6-6.5-7-7 4.4-.5 6.5-2.6 7-7zM18.5 13c.25 2 1.2 3 3.2 3.2-2 .25-3 1.2-3.2 3.2-.25-2-1.2-3-3.2-3.2 2-.25 3-1.2 3.2-3.2zM5 16.5c.2 1.5.9 2.2 2.4 2.4-1.5.2-2.2.9-2.4 2.4-.2-1.5-.9-2.2-2.4-2.4 1.5-.2 2.2-.9 2.4-2.4z"/></svg></span><b>Awesome UI on Fly</b></a><a class="btn sm" href="index.html"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>Live demo</a></header>
 
-  <main class="doc-wrap"><h1>Awesome UI on Fly · how it works</h1>
+  <main class="doc-wrap"><h1>How it works</h1>
     <ul class="points"><li><b>Jev</b> decides</li><li><b>LLM</b> fills in</li><li><b>Gate</b> guards · only door to the bank</li><li><b>Phone</b> only renders blocks</li></ul>
 
     <svg width="0" height="0" style="position:absolute"><defs><marker id="h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#22d3ee99"/></marker></defs></svg>
 
-    <h2>System view <small>the same live graph as the demo</small></h2>
+    <h2>System view</h2>
     <figure class="fig fig-live">
       <div class="flow-wrap"><svg id="flow" role="img" aria-label="Request pipeline: client, orchestrator, then Jev, LLM and Insights in parallel (rules as fallback), safety gate, core banking, UI composer, back to the client."></svg></div>
       <div class="flow-say"><i></i><span>a sample turn plays through the pipeline</span></div>
       <figcaption>Jev ∥ LLM ∥ Insights · both models down → rules · the demo draws every real request on this graph</figcaption>
     </figure>
 
-    <table>
+    <div class="tscroll"><table>
       <tr><th>Part</th><th>Job</th><th>Why separate</th></tr>
       <tr><td><b>Jev</b></td><td>Picks the action · closed set · scores</td><td>Can’t invent · thresholds · per-keystroke fast</td></tr>
       <tr><td><b>LLM</b></td><td>Extracts values: amount, merchant, dates</td><td>Good at language · never picks the action</td></tr>
@@ -69,7 +79,7 @@
       <tr><td><b>Safety gate</b></td><td>Card · eligibility · values · lane</td><td>Only door to a write</td></tr>
       <tr><td><b>Bank</b></td><td>Write → read-back</td><td>✓ only after read-back</td></tr>
       <tr><td><b>Composer</b></td><td>Results → UI blocks</td><td>Phone only renders</td></tr>
-    </table>
+    </table></div>
 
     <h2>A turn — press send</h2>
     <figure class="fig">
@@ -94,6 +104,13 @@
         <path class="sq" d="M190 365H838"/><text class="lbl" x="480" y="360">compose</text>
         <path class="sq ret" d="M840 395H62"/><text class="lbl" x="400" y="390">UI blocks</text>
       </svg>
+      <ol class="steps-m" aria-hidden="true">
+        <li><b>Phone → Orchestrator</b><span>text + screen context</span></li>
+        <li><b>Jev + LLM, in parallel</b><span>which action? 30–80 ms · which values? 400–900 ms</span></li>
+        <li><b>Safety gate</b><span>catalogue · card · eligibility · values · lane</span></li>
+        <li><b>Bank</b><span>lane = act → write → read-back → verified</span></li>
+        <li><b>Composer</b><span>results (done · confirm · ask · read) → UI blocks</span></li>
+      </ol>
       <figcaption>Every hop → latency panel + payloads</figcaption>
     </figure>
 
@@ -108,11 +125,16 @@
         <path class="ar" d="M170 88H228"/><path class="ar" d="M380 88H438"/><path class="ar" d="M610 78L678 48"/><path class="ar" d="M610 98L678 134"/>
         <text class="lbl" x="628" y="54">yes</text><text class="lbl" x="628" y="136">no</text>
       </svg>
+      <ol class="steps-m" aria-hidden="true">
+        <li><b>Keystroke #n</b><span>debounce 120 ms</span></li>
+        <li><b>Jev only</b><span>no LLM · no writes</span></li>
+        <li><b>Is #n the newest?</b><span>yes → draw the action tray · no → drop it</span></li>
+      </ol>
       <figcaption>Jev down → no tray · tray tap = ordinary turn · one road to the bank</figcaption>
     </figure>
 
     <h2>From verdict to UI</h2>
-    <table>
+    <div class="tscroll"><table>
       <tr><th>Jev verdict</th><th>What the phone gets</th></tr>
       <tr><td><b>ACTION · read</b></td><td>Chart from data shape + answer + chips</td></tr>
       <tr><td><b>ACTION · act</b></td><td>Write → read-back → ✓ + Undo</td></tr>
@@ -122,19 +144,19 @@
       <tr><td><b>HANDOFF</b></td><td>Can’t here + screen that can</td></tr>
       <tr><td><b>AMBIGUOUS</b></td><td>No tray · on send asks</td></tr>
       <tr><td><b>UNSUPPORTED</b></td><td>Says so</td></tr>
-    </table>
+    </table></div>
 
     <h2>Card resolution</h2><ul class="points"><li>picked</li><li>→ named</li><li>→ transaction</li><li>→ on screen</li><li>→ earlier in message</li><li>→ only card</li><li>→ ask</li></ul>
 
     <h2>Thresholds</h2>
-    <table>
+    <div class="tscroll"><table>
       <tr><th>Name</th><th>Value</th><th>Meaning</th></tr>
       <tr><td><code>act</code></td><td>0.60</td><td>act</td></tr>
       <tr><td><code>highStakes</code></td><td>0.70</td><td>irreversible</td></tr>
       <tr><td><code>handoff</code></td><td>0.50</td><td>name a screen</td></tr>
       <tr><td><code>candidateFloor</code></td><td>0.35</td><td>plausible reading</td></tr>
       <tr><td><code>margin</code></td><td>0.15</td><td>lead over runner-up</td></tr>
-    </table>
+    </table></div>
 
     <h2>Safeguards <small>this page · a real deployment</small></h2>
     <div class="guards">
@@ -167,7 +189,7 @@
     </div>
   </main>
   <footer class="foot">Simulated end to end in your browser · fictional data · illustrative latencies</footer>
-  <script src="js/flowgraph.js?v=41"></script>
-  <script src="js/arch-init.js"></script>
+  <script src="js/flowgraph.js?v=81"></script>
+  <script src="js/arch-init.js?v=81"></script>
 </body>
 </html>

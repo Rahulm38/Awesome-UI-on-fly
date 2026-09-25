@@ -36,10 +36,17 @@
     return m[a.length][b.length];
   }
 
+  // Short typos the fuzzy match skips (< 4 letters) — explicit, non-words only.
+  const SHORT = { fod: 'food', foood: 'food', hw: 'how', hwo: 'how', lst: 'last', lsat: 'last', wks: 'weeks', wk: 'week', crd: 'card', crds: 'cards',
+    spnd: 'spend', spnt: 'spent', mnth: 'month', mth: 'month', mnths: 'months', shw: 'show', frz: 'freeze', frze: 'freeze',
+    grocries: 'groceries', grocerys: 'groceries', wat: 'what', whr: 'where', ystrdy: 'yesterday', tdy: 'today', lmt: 'limit' };
+  const cased = (w, to) => w[0] === w[0].toUpperCase() ? to[0].toUpperCase() + to.slice(1) : to;
+
   // A word is corrected only when it's unknown, long enough to be a real attempt,
   // starts with the same letter, and exactly one known word is close enough.
   function word(w) {
     const lw = w.toLowerCase();
+    if (SHORT[lw]) return cased(w, SHORT[lw]);
     if (lw.length < 4 || KNOWN.has(lw) || /\d/.test(lw)) return w;
     const max = lw.length >= 8 ? 2 : 1;
     const near = VOCAB.filter(v => v[0] === lw[0] && Math.abs(v.length - lw.length) <= max).map(v => [v, dist(lw, v)]).filter(([, d]) => d <= max);

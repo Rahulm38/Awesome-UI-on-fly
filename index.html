@@ -22,27 +22,18 @@
   <meta name="twitter:description" content="Decisions and interfaces made on the fly — every model call, score and timing shown live.">
   <meta name="twitter:image" content="og-image.png">
   <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="site.css?v=49">
-  <link rel="stylesheet" href="phone.css?v=49">
+  <link rel="stylesheet" href="site.css?v=81">
+  <link rel="stylesheet" href="phone.css?v=81">
 </head>
 <body>
   <header class="top">
-    <a class="brand" href="#"><span class="mark"><svg viewBox="0 0 24 24"><use href="#i-sparkle"/></svg></span><b>Awesome UI on Fly</b><span class="tagline">starring Nova</span></a>
-    <a class="btn sm" href="architecture.html"><span class="full">Architecture</span><span class="short">Docs</span></a>
+    <a class="brand" href="#"><span class="mark"><svg viewBox="0 0 24 24"><use href="#i-sparkle"/></svg></span><b>Awesome UI on Fly</b></a>
+    <nav class="top-nav"><a class="btn sm" href="architecture.html">How it works</a></nav>
   </header>
 
   <section class="hero">
-    <span class="eyebrow"><i></i>Runs in your browser</span>
-      <h1>Decisions and interfaces, <em>made on the fly.</em></h1>
-      <div class="hero-cta">
-        <button class="btn primary" id="tour"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>Play the tour</button>
-      </div>
-    <div class="stats">
-      <span class="stat"><b>3 models at once</b>for every message</span>
-      <span class="stat"><b>14 chart types</b>chosen to fit each answer</span>
-      <span class="stat"><b>60% sure</b>before acting · <b>70%</b> for anything that can’t be undone</span>
-      <span class="stat"><b>✓ only</b>after the bank confirms the change</span>
-    </div>
+    <h1>Decisions and interfaces, <em>made on the fly.</em></h1>
+    <p>Ask the phone anything. Watch Jev decide and the UI build itself.</p>
   </section>
 
   <main class="stage">
@@ -85,14 +76,14 @@
         </div>
       </div>
       <div class="under">
-        <div class="seg" id="mode-seg" role="radiogroup" aria-label="When to call Jev"><span class="seg-l">Call Jev</span><button data-mode="send" class="on" role="radio" aria-checked="true">On send</button><button data-mode="live" role="radio" aria-checked="false">Every keystroke</button></div>
-        <p class="caption"><span class="kbd">/</span> to type · <span class="kbd">Esc</span> for scenarios</p>
+        <div class="seg" id="mode-seg" role="radiogroup" aria-label="When to call Jev"><span class="seg-l">Call Jev</span><button data-mode="live" class="on" role="radio" aria-checked="true">As you type</button><button data-mode="send" role="radio" aria-checked="false">On send</button></div>
+        <p class="mode-note" id="mode-note">Jev scores every keystroke · actions appear before you send</p>
       </div>
     </section>
 
     <section class="inspector">
       <div class="panel" id="try">
-        <div class="ph"><h2>Scenarios</h2><small>click to play</small></div>
+        <div class="ph"><h2>Scenarios</h2><small>see it · click to play it</small><div class="r"><button class="btn sm" id="surprise" type="button"><svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h3.5c2 0 3.2.9 4.3 2.6l.4.8c1.1 1.7 2.3 2.6 4.3 2.6H20M17 9.8 20 13l-3 3M4 17h3.5c1.4 0 2.4-.4 3.2-1.2M13.3 8.2c.8-.8 1.8-1.2 3.2-1.2H20M17 4l3 3-3 3"/></svg>Surprise me</button></div></div>
         <div class="scen-tabs" id="scen-tabs" role="tablist" aria-label="Scenario groups"></div>
         <div class="scen" id="scenarios" role="tabpanel"></div>
         <div class="narrate" id="narrate"><span class="np"><i class="np-dot"></i><span><b>Pick one</b> · or type in the phone</span></span></div>
@@ -127,34 +118,24 @@
     </section>
   </main>
 
-  <section class="how">
-    <h2>How a message becomes UI</h2>
-    <div class="steps">
-      <div class="step"><b>Decide</b><ul><li>Jev scores a closed list</li><li>Near tie → ask</li></ul></div>
-      <div class="step"><b>Fill in</b><ul><li>LLM reads the values</li><li>Insights, in parallel</li></ul></div>
-      <div class="step"><b>Guard</b><ul><li>Card · eligibility · confirm</li><li>Read back before ✓</li></ul></div>
-      <div class="step"><b>Draw</b><ul><li>Chart fits the data</li><li>Phone only renders</li></ul></div>
-    </div>
-  </section>
-
-  <footer class="foot"><span>Fictional data · no network calls</span><span><button class="linkish" id="guide-again" type="button">Show the guide</button> · <a href="architecture.html">Architecture</a> · <a href="architecture.html#rules">Design rules</a></span></footer>
+  <footer class="foot"><span>Fictional data · no network calls</span><span><button class="linkish" id="shuffle" type="button" title="Reload with different fictional data">Shuffle data</button> · <a href="architecture.html">How it works</a></span></footer>
 
   <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
     <symbol id="i-sparkle" viewBox="0 0 24 24"><path fill="currentColor" d="M10 2.5c.5 4.4 2.6 6.5 7 7-4.4.5-6.5 2.6-7 7-.5-4.4-2.6-6.5-7-7 4.4-.5 6.5-2.6 7-7zM18.5 13c.25 2 1.2 3 3.2 3.2-2 .25-3 1.2-3.2 3.2-.25-2-1.2-3-3.2-3.2 2-.25 3-1.2 3.2-3.2zM5 16.5c.2 1.5.9 2.2 2.4 2.4-1.5.2-2.2.9-2.4 2.4-.2-1.5-.9-2.2-2.4-2.4 1.5-.2 2.2-.9 2.4-2.4z"/></symbol>
   </defs></svg>
 
-  <script src="js/a11y.js?v=49"></script>
-  <script src="js/flowgraph.js?v=49"></script>
-  <script src="js/data.js?v=49"></script>
-  <script src="js/jev.js?v=49"></script>
-  <script src="js/llm.js?v=49"></script>
-  <script src="js/insights.js?v=49"></script>
-  <script src="js/engine.js?v=49"></script>
-  <script src="js/charts.js?v=49"></script>
-  <script src="js/phone.js?v=49"></script>
-  <script src="js/inspector.js?v=49"></script>
-  <script src="js/correct.js?v=49"></script>
-  <script src="js/main.js?v=49"></script>
-  <script src="js/guide.js?v=49"></script>
+  <script src="js/icons.js?v=81"></script>
+  <script src="js/a11y.js?v=81"></script>
+  <script src="js/flowgraph.js?v=81"></script>
+  <script src="js/data.js?v=81"></script>
+  <script src="js/jev.js?v=81"></script>
+  <script src="js/llm.js?v=81"></script>
+  <script src="js/insights.js?v=81"></script>
+  <script src="js/engine.js?v=81"></script>
+  <script src="js/charts.js?v=81"></script>
+  <script src="js/phone.js?v=81"></script>
+  <script src="js/inspector.js?v=81"></script>
+  <script src="js/correct.js?v=81"></script>
+  <script src="js/main.js?v=81"></script>
 </body>
 </html>

@@ -36,23 +36,28 @@
   const brackets = (x, y, w, h, k) => `M${x},${y + k}V${y}H${x + k}M${x + w - k},${y}H${x + w}V${y + k}M${x + w},${y + h - k}V${y + h}H${x + w - k}M${x + k},${y + h}H${x}V${y + h - k}`;
   const fan = (x1, y1, x2, y2) => `M${x1},${y1} C${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`;
 
-  // ── left → right: stages along one line, the parallel calls grouped in the middle ──
+  // ── wide containers: three columns — request in (left), parallel calls (middle), guard → render (right).
+  //    Compact enough to draw at ~1.3× so every label stays readable ──
   function horizontal() {
-    const W = 108, H = 52, Y = 128, GAP = 30, GW = 150, GY = 22, GH = 206, RH = 36;
-    const X = []; { let x = 0; [W, W, GW, W, W, W, W].forEach(w => { X.push(x); x += w + GAP; }); }
-    const GX = X[2], RW = GW - 20, RX = GX + 10, END = X[6] + W;
-    const rowY = { jev: 54, llm: 100, insight: 146, rules: 198 };
+    const W = 136, H = 58, CG = 50, GW = 214, GY = 24, RH = 38, VG = 28;
+    const GX = W + CG, RX = GX + 14, RW = GW - 28, OX = GX + GW + CG, END = OX + W;
+    const col = [0, 1, 2, 3].map(i => GY + i * (H + VG)), GB = col[3] + H, Yc = (GY + GB) / 2;
+    const rowY = { jev: GY + 50, llm: GY + 106, insight: GY + 162, rules: GY + 246 };
     const box = {};
-    ['phone', 'orch', null, 'safety', 'bank', 'composer', 'render'].forEach((id, i) => { if (id) box[id] = { x: X[i], y: Y - H / 2, w: W, h: H }; });
+    box.phone = { x: 0, y: Yc - H / 2 - VG - H, w: W, h: H };
+    box.orch = { x: 0, y: Yc - H / 2, w: W, h: H };
+    ['safety', 'bank', 'composer', 'render'].forEach((id, i) => (box[id] = { x: OX, y: col[i], w: W, h: H }));
     ROWS.forEach(id => (box[id] = { x: RX, y: rowY[id] - RH / 2, w: RW, h: RH }));
-    const seg = (a, b) => `M${a},${Y}H${b}`;
+    const cx = W / 2, ox = OX + W / 2, mid = GX + GW + CG / 2, sy = col[0] + H / 2;
+    const down = (x, a, b) => `M${x},${a}V${b}`;
     const edges = {
-      'phone-orch': seg(X[0] + W, X[1]), 'orch-group': seg(X[1] + W, GX), 'group-safety': seg(GX + GW, X[3]),
-      'safety-bank': seg(X[3] + W, X[4]), 'bank-composer': seg(X[4] + W, X[5]), 'composer-render': seg(X[5] + W, X[6]),
+      'phone-orch': down(cx, box.phone.y + H, box.orch.y), 'orch-group': `M${W},${Yc}H${GX}`,
+      'group-safety': `M${GX + GW},${Yc}H${mid - 6}Q${mid},${Yc} ${mid},${Yc - 6}V${sy + 6}Q${mid},${sy} ${mid + 6},${sy}H${OX}`,
+      'safety-bank': down(ox, col[0] + H, col[1]), 'bank-composer': down(ox, col[1] + H, col[2]), 'composer-render': down(ox, col[2] + H, col[3]),
     };
-    ROWS.forEach(id => { edges['in-' + id] = fan(GX, Y, RX, rowY[id]); edges['out-' + id] = fan(RX + RW, rowY[id], GX + GW, Y); });
-    return { view: [-10, -4, END + 20, 244], box, edges, group: { x: GX, y: GY, w: GW, h: GH }, div: [GX + 10, GX + GW - 10, 174],
-      text: { id: 12, t: 27, s: 40 }, stageDy: 9 };
+    ROWS.forEach(id => { edges['in-' + id] = fan(GX, Yc, RX, rowY[id]); edges['out-' + id] = fan(RX + RW, rowY[id], GX + GW, Yc); });
+    return { view: [-8, 0, END + 16, GB + 12], box, edges, group: { x: GX, y: GY, w: GW, h: GB - GY }, div: [GX + 10, GX + GW - 10, GY + 206],
+      text: { id: 15, t: 33, s: 48, rt: 17, rs: 31 }, stageDy: 9 };
   }
 
   // ── top → bottom (phones): one column; each parallel call has its own rail in and out,
@@ -82,7 +87,7 @@
       edges['out-' + id] = `M${RX + RW},${ry}H${b - 6}Q${b},${ry} ${b},${ry + 6}V${GB - 16}C${b},${GB - 4} ${cx},${GB - 12} ${cx},${GB}`;
     });
     return { view: [0, 0, 300, y - GAP + 10], box, edges, group: { x: GX, y: GT, w: GW, h: GB - GT }, div: [RX, RX + RW, (rowY.insight + rowY.rules) / 2],
-      text: { id: 12, t: 26, s: 38 }, stageDy: 7 };
+      text: { id: 12, t: 26, s: 38, rt: 15, rs: 28 }, stageDy: 7 };
   }
 
   function FlowGraph(svg, opts = {}) {
@@ -128,9 +133,9 @@
         mk('path', { class: 'br', d: brackets(b.x, b.y, b.w, b.h, 6) }, el);
         mk('circle', { class: 'led', cx: b.x + b.w - 9, cy: b.y + 9, r: 2.4 }, el);
         if (n.id) mk('text', { class: 'id', x: b.x + 8, y: b.y + L.text.id }, el).textContent = n.id;
-        mk('text', { class: 't', x: b.x + 8, y: b.y + (row ? 15 : L.text.t) }, el).textContent = n.t;
-        n.sub = mk('text', { class: 's', x: b.x + 8, y: b.y + (row ? 28 : L.text.s) }, el);
-        n.ms = mk('text', { class: 'ms', x: b.x + b.w - 16, y: b.y + (row ? 15 : 12), 'text-anchor': 'end' }, el);
+        mk('text', { class: 't', x: b.x + 8, y: b.y + (row ? L.text.rt : L.text.t) }, el).textContent = n.t;
+        n.sub = mk('text', { class: 's', x: b.x + 8, y: b.y + (row ? L.text.rs : L.text.s) }, el);
+        n.ms = mk('text', { class: 'ms', x: b.x + b.w - 16, y: b.y + (row ? L.text.rt : 14), 'text-anchor': 'end' }, el);
         [n.ms.textContent, n.sub.textContent] = keep[id] || ['', n.s];
         if (switchable.includes(id) && opts.onNodeClick) el.addEventListener('click', () => opts.onNodeClick(id));
         g.nodeEl[id] = el;

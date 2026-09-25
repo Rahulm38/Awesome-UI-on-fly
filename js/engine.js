@@ -188,7 +188,7 @@
     if (SNAP.at && age < SNAP.STALE) { loadSnapshot(null, 'refresh in background'); return { cache: 'stale-served', age }; }
     await loadSnapshot(trace, 'cold start'); return { cache: 'miss' };
   }
-  const SPENDY = /\b(spend|spent|spending|how much|money|merch\w*|merhc\w*|where did|breakdown|subscriptions?|recurring|unusual|strange|suspicious|limit left|left to spend|how often|which days?|weekday|weekend|compare|vs|versus|top|biggest|trend|per (week|month)|changed|usual|normal|a lot|on track|pace|by card)\b/i;
+  const SPENDY = /\b(spend|spent|spending|how much|money|merch\w*|merhc\w*|where did|breakdown|subscriptions?|recurring|unusual|strange|suspicious|limit left|left to spend|how often|which days?|weekday|weekend|compare|vs|versus|top|biggest|trend|per (week|month)|changed|usual|normal|a lot|on track|pace|by card|declined?|declines|rejected|calendar|break down)\b/i;
   const chartCache = new Map(); // text|card → { panel, at }, kept 60 s so the sent answer reuses the typed numbers
   async function insight(trace, text, ctx, typing) {
     return span(trace, 'insight', typing ? 'Insights · preview' : 'Insights · build', { text, scope: ctxOf(ctx) }, () => null, [1, 3]).then(async () => {
@@ -431,6 +431,8 @@
     V1: ['Show it by week', 'Is that a lot?'], V3: ['Where did it go?', 'Which days do I spend most?'], V7: ['What changed this month?', 'Show it by card'],
     V8: ['Top merchants', 'What changed this month?'], V10: ['What changed this month?', 'Where did my money go?'], V11: ['How does this month compare with last month?'],
     V12: ['How often do I go to Brewline?'], V14: ['Anything unusual?'], V21: ['Show my subscriptions'], V2: ['Food spending by week'], V18: ['Food spending by week'], V13: ['Top merchants'], V5: ['Where did my money go?'], V9: ['What changed this month?'],
+    V4: ['What changed since last month by category?'], V15: ['Break down my spending by category'], V16: ['Anything unusual?'], V17: ['Show my spending calendar'],
+    V19: ['Which days do I spend most?'], V20: ['What changed since last month by category?'],
   };
 
   function compose(results) {
@@ -467,6 +469,6 @@
   }
 
   const resetState = () => { NovaData.reset(); queue.length = 0; for (const k in undoable) delete undoable[k]; chartCache.clear(); log('state reset → a clean run (cards back to their starting state)', 'dim'); };
-  window.Engine = { bus, settings, message, intent, log, resetState,
+  window.Engine = { bus, settings, message, intent, log, resetState, splitParts,
     preview: async (text, ctx) => { if (!SPENDY.test(text)) return null; const t = newTrace('typing', text, false, true); log('keystroke → Insights only · Jev isn’t called in “On send” mode', 'dim'); return (await insight(t, text, ctx, true)).panel; }, prewarm: () => loadSnapshot(null, 'sheet opened → prewarm') };
 })();

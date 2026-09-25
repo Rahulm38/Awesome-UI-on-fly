@@ -8,24 +8,24 @@
   const D = window.NovaData;
 
   const KINDS = {
-    FREEZE:            { label: 'Freeze card', icon: '❄', reversible: true, undo: 'UNFREEZE', pattern: 'A' },
-    UNFREEZE:          { label: 'Unfreeze card', icon: '☀', reversible: true, undo: 'FREEZE', pattern: 'A' },
-    SET_LIMIT:         { label: 'Set a spending limit', icon: '⇥', reversible: true, undo: 'REMOVE_LIMIT', pattern: 'B', slots: ['amount'] },
-    BLOCK_MERCHANT:    { label: 'Block a merchant', icon: '⊘', reversible: true, undo: 'UNBLOCK_MERCHANT', pattern: 'C', slots: ['merchant'] },
-    SET_INTERNATIONAL: { label: 'Allow use abroad', icon: '✈', reversible: true, undo: 'CLEAR_INTERNATIONAL', pattern: 'B', slots: ['country'] },
-    BLOCK_ATM:         { label: 'Turn off ATM withdrawals', icon: '⊟', reversible: true, undo: 'ALLOW_ATM', pattern: 'A' },
-    ACTIVATE_CARD:     { label: 'Activate card', icon: '✓', reversible: false, pattern: 'E' },
-    REPORT_LOST:       { label: 'Report lost or stolen', icon: '⚠', reversible: false, highStakes: true, pattern: 'E' },
-    RAISE_DISPUTE:     { label: 'Dispute a charge', icon: '⚖', reversible: false, highStakes: true, pattern: 'E', slots: ['merchant'] },
-    SPEND_INSIGHT:     { label: 'Show my spending', icon: '▦', read: true, pattern: 'R' },
+    FREEZE:            { label: 'Freeze card', icon: 'snowflake', reversible: true, undo: 'UNFREEZE', pattern: 'A' },
+    UNFREEZE:          { label: 'Unfreeze card', icon: 'sun', reversible: true, undo: 'FREEZE', pattern: 'A' },
+    SET_LIMIT:         { label: 'Set a spending limit', icon: 'gauge', reversible: true, undo: 'REMOVE_LIMIT', pattern: 'B', slots: ['amount'] },
+    BLOCK_MERCHANT:    { label: 'Block a merchant', icon: 'ban', reversible: true, undo: 'UNBLOCK_MERCHANT', pattern: 'C', slots: ['merchant'] },
+    SET_INTERNATIONAL: { label: 'Allow use abroad', icon: 'plane', reversible: true, undo: 'CLEAR_INTERNATIONAL', pattern: 'B', slots: ['country'] },
+    BLOCK_ATM:         { label: 'Turn off ATM withdrawals', icon: 'atm', reversible: true, undo: 'ALLOW_ATM', pattern: 'A' },
+    ACTIVATE_CARD:     { label: 'Activate card', icon: 'badge-check', reversible: false, pattern: 'E' },
+    REPORT_LOST:       { label: 'Report lost or stolen', icon: 'shield', reversible: false, highStakes: true, pattern: 'E' },
+    RAISE_DISPUTE:     { label: 'Dispute a charge', icon: 'scale', reversible: false, highStakes: true, pattern: 'E', slots: ['merchant'] },
+    SPEND_INSIGHT:     { label: 'Show my spending', icon: 'chart', read: true, pattern: 'R' },
   };
 
   // Things Nova cannot do, but can point to the screen that can.
   const HANDOFFS = {
-    FIND_ATM:          { label: 'Find an ATM', screen: 'ATM locator', icon: '⌖' },
-    CHANGE_PIN:        { label: 'Change your PIN', screen: 'Security settings', icon: '#' },
-    VIEW_TRANSACTIONS: { label: 'See your transactions', screen: 'Transactions', icon: '≡' },
-    VIEW_REWARDS:      { label: 'See your rewards', screen: 'Rewards', icon: '★' },
+    FIND_ATM:          { label: 'Find an ATM', screen: 'ATM locator', icon: 'map-pin' },
+    CHANGE_PIN:        { label: 'Change your PIN', screen: 'Security settings', icon: 'key' },
+    VIEW_TRANSACTIONS: { label: 'See your transactions', screen: 'Transactions', icon: 'list' },
+    VIEW_REWARDS:      { label: 'See your rewards', screen: 'Rewards', icon: 'gift' },
   };
 
   const T = { act: 0.60, highStakes: 0.70, handoff: 0.50, candidateFloor: 0.35, margin: 0.15 };
@@ -53,6 +53,8 @@
     ['SPEND_INSIGHT', /\b(spend|spent|spending|expenses?|breakdown)\b|how much|money (go|went)/, 3],
     ['SPEND_INSIGHT', /\b(subscriptions?|recurring|unusual|suspicious|strange|how often|which days?|weekdays?|top merchants|biggest|trend|what changed|on track|by card|by week|by month)\b|is (that|this|it) a lot|compare|\bvs\b/, 3.2],
     ['SPEND_INSIGHT', /\bsplit\b|\bby merchants?\b|\bmerchants?\b|\bby (card|category|categories|type)\b/, 3],
+    // Declined attempts, the spending calendar and "left today" are all reads, never card actions.
+    ['SPEND_INSIGHT', /\b(declined?|declines|rejected|bounced)\b|didn'?t go through|\bcalendar\b|\bheat ?map\b|\bday by day\b|\bcan i (still )?spend\b|\bbreak (it )?down\b/, 3.2],
     ['SPEND_INSIGHT', /\b(food|dining|groceries|grocery|transport|fuel|petrol|gas|shopping|entertainment|health|pharmacy|utilities|bills|household|salon|education|pets?|gifts?|coffee|flights?)\b.*\b(last|this|past)\s+(\d+\s+|one |two |three |six )?(week|month|day|year)s?\b/, 3],
     ['SPEND_INSIGHT', /\b(block|unblock|stop|ban)\b/, -3],
     ['SPEND_INSIGHT', /\blimit\b.*\b(left|remaining|used)\b|\b(left|remaining)\b.*\blimit\b|left to spend/, 5],

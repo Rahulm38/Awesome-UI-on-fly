@@ -31,20 +31,29 @@ The phone is a spending screen with the assistant sheet open over it. Scenario b
 |---|---|
 | how much on food last month | V1 stat tile: number, change chip, 6-month sparkline |
 | food vs transport | V2 face-off |
+| compare food and shopping over the last 3 months | V4 grouped columns, one colour per subject |
 | food spending by week · last 6 months | V3 columns with your *usual* line and band; the period in progress is hatched |
 | spending by card | V5 split bar (falls back to V1 when ≥ 97 % is on one card) |
+| spending by category each month | V6 stacked columns (also by card, debit/credit) |
 | top merchants | V7 ranked bars, top 5 + Other |
 | where did my money go | V8 donut, only when the top slice is ≥ 1.3× the next, otherwise V7 |
 | how much of my limit is left | V9 limit meter with an even-pace tick (V1 when no limit is set) |
 | how does this month compare with last month | V10 cumulative pace line |
 | what changed this month | V11 ↑/↓ by category |
+| what changed since last month by category | V15 dumbbell, last month → this month |
+| any declined payments | V16 declines with reasons, not counted in spend |
+| how much can I spend today | V17 left today against a daily limit (V1 without one) |
 | which days do I spend most | V12 weekday strip |
 | how often do I go to Brewline | V13 visits and last visit |
 | show my subscriptions | V14 recurring payments |
 | is my food spending a lot | V18 usual range gauge with a verdict chip |
+| show my spending calendar | V19 month heatmap |
+| break down my spending | V20 category rows that open to their merchants |
 | anything unusual | V21 payments well above that merchant's usual — or a calm "nothing unusual" |
 
-**Multi-step stories.** Seven real conversations played turn by turn — typing, tapping cards and Confirm — from a clean state each time: budget reset, monthly review, spending deep-dive, suspicious charge, trip planning, new card setup, three asks at once. Between them every chart type appears.
+**Multi-step stories.** Seven real conversations played turn by turn — typing, tapping cards and Confirm — from a clean state each time: budget reset, monthly review, spending deep-dive, suspicious charge, trip planning, new card setup, three asks at once. Together with the instant charts, every chart type appears.
+
+**Scenarios are a live gallery.** Every card shows what it will produce: the chart drawn from today’s data, Jev’s real scores against its thresholds (grouped by what Jev decides: acts, confirms first, asks first, hands off, holds back), or a story’s steps. Filter charts by category, click any card and it flies into the phone, or press *Surprise me*.
 
 **Voice.** Tap the mic with an empty input (Chrome, Edge, Safari). Speech is transcribed by the browser and sent as a LIVE turn.
 
@@ -108,4 +117,4 @@ Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIB
 
 ## License
 
-The project code is released under the [MIT License](LICENSE). The bundled Geist and Geist Mono font files are separately licensed under the SIL Open Font License 1.1; see [`fonts/OFL.txt`](fonts/OFL.txt).
+The project code is released under the [MIT License](LICENSE). The bundled Geist and Geist Mono font files are separately licensed under the SIL Open Font License 1.1; see [`fonts/OFL.txt`](fonts/OFL.txt). Icons are a bundled subset of [Lucide](https://lucide.dev) under the ISC License; see [`LICENSE-LUCIDE`](LICENSE-LUCIDE).

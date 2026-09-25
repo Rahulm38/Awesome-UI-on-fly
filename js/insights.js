@@ -32,6 +32,8 @@
     [/\b(pets?|pet food|vet)\b/, 'Pets'], [/\b(gifts?|flowers?)\b/, 'Gifts'],
   ];
   const INTENTS = [
+    ['DECLINED', /\b(declined?|declines|rejected|refused|bounced|didn'?t go through)\b/],
+    ['CALENDAR', /\bcalendar\b|\bheat ?map\b|\bday by day\b|\bdaily spend/],
     ['UNUSUAL', /\b(unusual|strange|suspicious|weird|odd|out of the ordinary)\b/],
     ['SUBSCRIPTIONS', /\b(subscriptions?|recurring|monthly bills?)\b/],
     ['LIMIT', /\blimit\b.*\b(left|remaining|used)\b|\b(left|remaining)\b.*\blimit\b|left to spend|can i (still )?spend/],
@@ -66,6 +68,13 @@
     let intent = (INTENTS.find(([, re]) => re.test(t)) || ['TOTAL'])[0];
     if (intent === 'COMPARE' && subjects.length < 2) intent = /last month/.test(t) ? 'PACE' : 'TOTAL';
     if (intent === 'HABIT' && !subjects.some(s => s.kind === 'merchant')) intent = 'TOTAL';
+    // "how much can I spend today" → what's left of a daily limit.
+    if (intent === 'LIMIT' && /\btoday\b/.test(t)) intent = 'TODAY_LEFT';
+    const byCat = /\bby categor(y|ies)\b|\beach categor(y|ies)\b|\bper categor(y|ies)\b/.test(t);
+    // "what changed since last month by category" → a dumbbell per category.
+    if (intent === 'CHANGE' && (byCat || /\bsince last month\b/.test(t))) intent = 'SHIFT';
+    // "break down my spending by category" → category rows that open onto their merchants.
+    if ((intent === 'BREAKDOWN' || intent === 'TOTAL') && !subjects.length && /\bbreak (it |this )?down\b|\bdrill\b/.test(t)) intent = 'DRILL';
     const nm = t.match(/\b(?:last|past) (\d+|one|two|three|four|five|six|eight|twelve) (day|week|month)s?\b/);
     const custom = nm && { n: +(NUM[nm[1]] || nm[1]), unit: nm[2] };
     const period = custom && !['6 month', '3 month', '30 day', '8 week'].includes(`${custom.n} ${custom.unit}`) ? `last ${custom.n} ${custom.unit}s`
@@ -80,12 +89,19 @@
       merchant: /\bmerchants?\b/.test(t),
       time: /\b(by|per|each) (month|week)|\bmonthly\b|\bweekly\b|\bover time\b|last (\d+|two|three|four|six) months/.test(t),
     };
+    by.category = byCat;
+    const multiMonth = /^last (\d+) months$/.test(period) && +/\d+/.exec(period)[0] >= 2;
     if ((by.card || by.type) && by.time) intent = 'STACK';
     else if (by.type) intent = 'BY_TYPE';
     else if (by.card && intent !== 'TREND') intent = 'BY_CARD';
+    else if (by.category && by.time && ['BREAKDOWN', 'DRILL', 'TREND', 'TOTAL'].includes(intent)) { intent = 'STACK'; by.category = true; }
+    // Two or three subjects over several months → grouped columns, one colour each.
+    else if (intent === 'COMPARE' && subjects.length >= 2 && (by.time || multiMonth)) intent = 'GROUPED';
     const stackSplit = /week/.test(t) ? 'WEEK' : 'MONTH';
-    return { raw: t, intent, subjects, period: intent === 'STACK' && period === 'this month' ? (stackSplit === 'WEEK' ? 'last 8 weeks' : 'last 3 months') : period,
-      split: intent === 'STACK' ? stackSplit : split, by };
+    const widen = (intent === 'STACK' || intent === 'GROUPED') && period === 'this month';
+    return { raw: t, intent, subjects, period: widen ? (stackSplit === 'WEEK' ? 'last 8 weeks' : intent === 'GROUPED' || by.category ? 'last 6 months' : 'last 3 months')
+      : intent === 'DECLINED' && period === 'this month' ? 'last 30 days' : period,
+      split: intent === 'STACK' || intent === 'GROUPED' ? stackSplit : split, by };
   }
 
   function range(p) {
@@ -122,7 +138,13 @@
     const ok = (v, why) => ({ visual: v, why, ladder });
     const fall = (v, why) => { ladder.push(`${v}: ${why}`); };
     const { intent } = q;
-    if (intent === 'STACK') return ok('V6', `split by ${q.by.type ? 'debit vs credit' : 'card'} over ${q.split === 'WEEK' ? 'weeks' : 'months'} → stacked columns`);
+    if (intent === 'STACK') return ok('V6', `split by ${q.by.type ? 'debit vs credit' : q.by.card ? 'card' : 'category'} over ${q.split === 'WEEK' ? 'weeks' : 'months'} → stacked columns`);
+    if (intent === 'GROUPED') return ok('V4', `${Math.min(3, q.subjects.length)} subjects over ${q.split === 'WEEK' ? 'weeks' : 'months'} → grouped columns`);
+    if (intent === 'DECLINED') return ok('V16', 'asked about declined payments → list with reasons, not counted in spend');
+    if (intent === 'CALENDAR') return ok('V19', 'asked for a calendar → month grid shaded by daily spend');
+    if (intent === 'SHIFT') return ok('V15', 'what moved since last month, per category → dumbbell, last month → this month');
+    if (intent === 'DRILL') return ok('V20', 'categories that open onto their merchants');
+    if (intent === 'TODAY_LEFT') { if (ctx.daily) return ok('V17', 'a daily limit exists → what’s left of it today'); fall('V17', 'no daily limit on this card'); }
     if (intent === 'BY_TYPE') return ok('V5', 'debit vs credit → one split bar');
     if (intent === 'TOP' && q.subjects.some(s => s.kind === 'category')) return ok('V7', 'merchants inside a category → ranked with logos, tap one for its payments');
     if (intent === 'UNUSUAL') return ok('V21', 'asked for anything unusual');
@@ -160,7 +182,8 @@
     const byCard = {}; pick(r.a, r.b).forEach(t => (byCard[t.cardId] = (byCard[t.cardId] || 0) + t.amount));
     const cardTot = Object.values(byCard).reduce((a, b) => a + b, 0) || 1;
     const card = scope.cardId ? D.card(scope.cardId) : D.cards.find(c => c.limit);
-    const ctx = { limit: card && card.limit, history: 6, ratio: cats.length > 1 ? cats[0][1] / cats[1][1] : 9, topShare: Math.max(0, ...Object.values(byCard)) / cardTot };
+    const dcard = scope.cardId ? D.card(scope.cardId) : D.cards.find(c => c.daily && !c.archived && !c.frozen);
+    const ctx = { limit: card && card.limit, daily: dcard && dcard.daily, history: 6, ratio: cats.length > 1 ? cats[0][1] / cats[1][1] : 9, topShare: Math.max(0, ...Object.values(byCard)) / cardTot };
     const pickV = choose(q, ctx);
     const what = subj ? subj.name : 'everything';
     const scopeLbl = scope.cardId ? D.tag(D.card(scope.cardId)) : `${D.cards.filter(c => !c.archived).length} cards`;
@@ -180,8 +203,22 @@
         const chg = d == null ? '' : Math.abs(d) < 0.03 ? ` · about the same as ${pr.label}` : ` · ${Math.abs(Math.round(d * 100))}% ${d > 0 ? 'more' : 'less'} than ${pr.label}`;
         Object.assign(P, { hero: { display: money(total) },
           series: [{ colorSlot: 0, points: spark.map((v, i) => ({ label: mon(addM(som(TODAY), i - 5)), amount: v })) }],
-          takeaway: total === 0 ? `${money(0)} on ${what} ${r.label}` : `${money(total)} on ${what} ${r.label}${chg}` });
+          takeaway: total === 0 ? `Nothing on ${what} ${r.label}` : chg ? chg.slice(3).replace(/^./, c => c.toUpperCase()) : `${money(total)} on ${what} ${r.label}` });
         if (!ctx.limit && q.intent === 'LIMIT') P.takeaway = 'No limit is set, so here’s what you’ve spent instead';
+        if (!ctx.daily && q.intent === 'TODAY_LEFT') P.takeaway = 'No daily limit is set, so here’s what you’ve spent today';
+      },
+      // Grouped columns: each month a cluster, one colour per subject.
+      V4() {
+        const subs = q.subjects.slice(0, 3), buckets = [];
+        if (q.split === 'WEEK') for (let w = monday(r.a); w <= r.b; w = day(w, 7)) buckets.push({ label: md(w), a: w, b: day(w, 6), partial: day(w, 6) > TODAY });
+        else for (let m = som(r.a); m <= r.b; m = addM(m, 1)) buckets.push({ label: mon(m), a: m, b: day(addM(m, 1), -1), partial: addM(m, 1) > TODAY });
+        const series = subs.map((s, i) => ({ label: s.name, colorSlot: i + 1, points: buckets.map(b => ({ label: b.label, amount: sum(pick(b.a, b.b, s)), partial: b.partial })) }));
+        series.forEach(s => (s.total = s.points.reduce((n, p) => n + p.amount, 0)));
+        const rank = [...series].sort((a, b) => b.total - a.total), [big, next] = rank;
+        const wins = big.points.filter((p, i) => series.every(o => o === big || o.points[i].amount <= p.amount)).length;
+        const close = big.total && (big.total - next.total) / big.total < 0.03;
+        Object.assign(P, { series: series.map(s => ({ ...s, value: short(s.total) })),
+          takeaway: close ? `About the same ${r.label}` : `${big.label} is ${money(big.total - next.total)} more${series.length > 2 ? ` than ${next.label}` : ''} ${r.label}${wins > buckets.length / 2 ? `, ahead in ${wins} of ${buckets.length} ${q.split === 'WEEK' ? 'weeks' : 'months'}` : ''}` });
       },
       V2() {
         const pts = q.subjects.slice(0, 2).map((s, i) => ({ label: s.name, amount: sum(pick(r.a, r.b, s)) }));
@@ -213,10 +250,13 @@
         const byType = q.by.type, buckets = [];
         if (q.split === 'WEEK') for (let w = monday(r.a); w <= r.b; w = day(w, 7)) buckets.push({ label: md(w), a: w, b: day(w, 6), partial: day(w, 6) > TODAY });
         else for (let m = som(r.a); m <= r.b; m = addM(m, 1)) buckets.push({ label: mon(m), a: m, b: day(addM(m, 1), -1), partial: addM(m, 1) > TODAY });
-        const keyOf = t => byType ? D.card(t.cardId).type : t.cardId;
+        // By category: the top 3 keep a colour each, everything else is one grey "Other".
+        const byCatV = !byType && !q.by.card && q.by.category;
+        const catRank = byCatV ? Object.entries(cur.reduce((o, t) => ((o[t.category] = (o[t.category] || 0) + t.amount), o), {})).sort((a, b) => b[1] - a[1]).map(x => x[0]) : [];
+        const keyOf = t => byType ? D.card(t.cardId).type : byCatV ? (catRank.indexOf(t.category) < 3 ? t.category : 'Other') : t.cardId;
         const groups = [...new Set(cur.map(keyOf))];
-        const totals = groups.map(g => [g, sum(cur.filter(t => keyOf(t) === g))]).sort((a, b) => b[1] - a[1]);
-        const series = totals.map(([g], i) => ({ label: byType ? g : `••${D.card(g).last4} ${D.card(g).type}`, colorSlot: i + 1,
+        const totals = groups.map(g => [g, sum(cur.filter(t => keyOf(t) === g))]).sort((a, b) => (a[0] === 'Other') - (b[0] === 'Other') || b[1] - a[1]);
+        const series = totals.map(([g], i) => ({ label: byType || byCatV ? g : `••${D.card(g).last4} ${D.card(g).type}`, colorSlot: g === 'Other' && byCatV ? -1 : i + 1,
           points: buckets.map(b => ({ label: b.label, amount: sum(pick(b.a, b.b).filter(t => keyOf(t) === g)), partial: b.partial })) }));
         const all = totals.reduce((n, x) => n + x[1], 0) || 1;
         Object.assign(P, { series, takeaway: totals.length ? `${series[0].label} covers ${Math.round(totals[0][1] / all * 100)}% of ${subj ? what.toLowerCase() : 'your'} spend, ${per}` : 'No spending in this period' });
@@ -247,7 +287,8 @@
         Object.assign(P, { title: `${D.tag(card)} limit`, hero: { display: `${money(Math.max(0, card.limit - spent))} left` },
           meter: { limit: card.limit, spent, pace: TODAY.getDate() / dim, limitDisplay: money(card.limit), spentDisplay: money(spent) },
           takeaway: spent > card.limit * TODAY.getDate() / dim ? 'Ahead of an even pace — slow down a little' : 'Under an even pace for the month',
-          perDay: `${money(Math.max(0, (card.limit - spent) / (dim - TODAY.getDate() + 1)))} a day for the rest of ${mon(TODAY)}` });
+          perDay: `${money(Math.max(0, (card.limit - spent) / (dim - TODAY.getDate() + 1)))} a day for the rest of ${mon(TODAY)}`,
+          keepFooter: true, footer: `${mon(TODAY)} 1–${TODAY.getDate()} · so far · ${D.tag(card)}` });
       },
       V10() {
         const mk = (a, n) => { let c = 0; const out = []; for (let i = 0; i < n; i++) { c += sum(pick(day(a, i), day(a, i))); out.push(c); } return out; };
@@ -289,6 +330,56 @@
         Object.assign(P, { title: 'Subscriptions', hero: { display: `${money(tot)} / month` }, series: [{ points: found }], footer: `Seen 3+ months in a row · ${scopeLbl}`,
           takeaway: `${found.length} recurring payments · ${money(tot * 12)} a year` });
       },
+      // Dumbbell: each category, last month (same days) → this month so far.
+      V15() {
+        const pa = addM(som(TODAY), -1), pb = day(pa, TODAY.getDate() - 1), was = {}, now = {};
+        base.filter(t => inR(t, pa, pb)).forEach(t => (was[t.category] = (was[t.category] || 0) + t.amount));
+        base.filter(t => inR(t, som(TODAY), TODAY)).forEach(t => (now[t.category] = (now[t.category] || 0) + t.amount));
+        const pts = [...new Set([...Object.keys(was), ...Object.keys(now)])].map(label => ({ label, from: +(was[label] || 0).toFixed(2), to: +(now[label] || 0).toFixed(2) }))
+          .sort((a, b) => Math.max(b.from, b.to) - Math.max(a.from, a.to)).slice(0, 6);
+        pts.forEach(p => { p.amount = p.to - p.from; p.fromDisplay = short(p.from); p.display = short(p.to); });
+        const mv = [...pts].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))[0];
+        Object.assign(P, { series: [{ points: pts }], legend: [{ label: `${mon(pa)} 1–${TODAY.getDate()}`, colorSlot: -1 }, { label: `${mon(TODAY)} 1–${TODAY.getDate()}`, colorSlot: 0 }],
+          footer: `${mon(TODAY)} 1–${TODAY.getDate()} vs ${mon(pa)} 1–${TODAY.getDate()} · ${scopeLbl}`,
+          takeaway: mv ? `Biggest move: ${mv.label} ${mv.amount >= 0 ? 'up' : 'down'} ${money(Math.abs(mv.amount))}` : 'No spending to compare' });
+      },
+      // Declined attempts — kept apart from spend; nothing here was charged.
+      V16() {
+        const rows = D.declines.filter(t => (!scope.cardId || t.cardId === scope.cardId) && inR(t, r.a, r.b) && (!subj || (subj.kind === 'category' ? t.category === subj.name : t.merchant === subj.name)))
+          .sort((a, b) => b.date - a.date).map(t => ({ label: t.merchant, amount: t.amount, display: money(t.amount), reason: t.reason,
+            when: `${md(t.date)} · ${t.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · ••${D.card(t.cardId).last4}` }));
+        Object.assign(P, { series: [{ points: rows }], keepFooter: true, footer: `${md(r.a)} – ${md(r.b)} · ${scopeLbl} · not counted in spend`,
+          takeaway: rows.length ? `${rows.length} declined ${r.label} — ${rows.length > 1 ? 'none were' : 'it wasn’t'} charged` : `No declined payments ${r.label}` });
+      },
+      // What's left of a card's daily limit today.
+      V17() {
+        const spent = sum(base.filter(t => inR(t, TODAY, TODAY) && t.cardId === dcard.id));
+        const left = Math.max(0, dcard.daily - spent);
+        Object.assign(P, { hero: { display: `${money(left)} left today` },
+          meter: { limit: dcard.daily, spent, limitDisplay: `${money(dcard.daily)} daily limit`, spentDisplay: `${money(spent)} spent` },
+          keepFooter: true, footer: `${md(TODAY)} · ${D.tag(dcard)} · resets at midnight`,
+          takeaway: spent >= dcard.daily ? 'You’ve reached today’s limit on this card' : spent ? `${money(spent)} spent on ${D.tag(dcard)} so far today` : `Nothing spent on ${D.tag(dcard)} yet today` });
+      },
+      // Month calendar: each day shaded by what went out that day.
+      V19() {
+        const mStart = q.period === 'last month' ? addM(som(TODAY), -1) : som(TODAY), dim = new Date(mStart.getFullYear(), mStart.getMonth() + 1, 0).getDate();
+        const days = Array.from({ length: dim }, (_, i) => { const d = day(mStart, i); const amt = d > TODAY ? null : sum(pick(d, d)); return { label: String(i + 1), amount: amt, display: amt == null ? '' : short(amt), today: +d === +TODAY }; });
+        const past = days.filter(x => x.amount != null), top = past.reduce((m, x) => (x.amount > m.amount ? x : m), past[0] || { amount: 0 });
+        const quiet = past.filter(x => !x.amount).length, tot = past.reduce((n, x) => n + x.amount, 0);
+        Object.assign(P, { series: [{ colorSlot: 0, points: days }], offset: (mStart.getDay() + 6) % 7, hero: { display: money(tot) },
+          keepFooter: true, footer: `${subj ? subj.name + ' · ' : ''}${md(mStart)}–${mStart.getMonth() === TODAY.getMonth() ? TODAY.getDate() + ' · so far' : dim} · ${scopeLbl}`,
+          takeaway: top.amount ? `Biggest day ${mon(mStart)} ${top.label} at ${money(top.amount)}${quiet ? ` · ${quiet} no-spend day${quiet > 1 ? 's' : ''}` : ''}` : 'No spending this month' });
+      },
+      // Category rows; tap one to see the merchants inside it.
+      V20() {
+        const s = cats;
+        const inside = c => { const m = {}; cur.filter(t => t.category === c).forEach(t => { m[t.merchant] = m[t.merchant] || { n: 0, a: 0 }; m[t.merchant].n++; m[t.merchant].a += t.amount; });
+          return Object.entries(m).sort((a, b) => b[1].a - a[1].a).slice(0, 5).map(([label, v]) => ({ label, display: money(v.a), when: `${v.n} payment${v.n > 1 ? 's' : ''}` })); };
+        const pts = s.slice(0, 6).map(([label, amount], i) => ({ label, amount, display: money(amount), colorSlot: i === 0 ? 0 : -1, inside: inside(label) }));
+        const other = s.slice(6).reduce((n, x) => n + x[1], 0);
+        if (other > 0) pts.push({ label: 'Other', amount: other, display: money(other), colorSlot: -1, other: true, count: s.length - 6 });
+        Object.assign(P, { series: [{ points: pts }], takeaway: pts.length ? `${pts[0].label} leads at ${pts[0].display} — tap a category for its merchants` : 'No spending in this period' });
+      },
       V18() {
         const months = []; for (let i = 6; i >= 1; i--) { const a = addM(som(TODAY), -i); months.push(sum(pick(a, day(addM(a, 1), -1)))); }
         const dim = new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 0).getDate();
@@ -303,10 +394,12 @@
         const a = day(TODAY, -14), rows = [];
         base.filter(t => inR(t, a, TODAY)).forEach(t => {
           const hist = base.filter(x => x.merchant === t.merchant && x !== t).map(x => x.amount), m = median(hist);
+          const earlier = hist.length && base.some(x => x.merchant === t.merchant && x.date < t.date);
           if (hist.length >= 3 && t.amount > 3 * m) rows.push({ label: t.merchant, amount: t.amount, display: money(t.amount), when: md(t.date), reason: `${Math.round(t.amount / m)}× your usual` });
+          else if (!earlier && t.amount >= 20) rows.push({ label: t.merchant, amount: t.amount, display: money(t.amount), when: md(t.date), reason: 'First time here' });
         });
         Object.assign(P, { title: 'Unusual activity', series: [{ points: rows }], footer: `Last 14 days · ${scopeLbl}`,
-          takeaway: rows.length ? `${rows.length} payment${rows.length > 1 ? 's' : ''} well above your usual` : `Nothing unusual on ${md(TODAY)}` });
+          takeaway: rows.length ? `${rows.length} payment${rows.length > 1 ? 's' : ''} worth a look` : 'Nothing unusual in the last 14 days' });
       },
     };
     V[P.visual]();
@@ -315,11 +408,14 @@
     const TITLE = {
       V1: `${Subj || 'All spend'} · ${per}`, V2: `${q.subjects.slice(0, 2).map(x => x.name).join(' vs ')} · ${per}`,
       V3: `${Subj || 'All spend'} · ${q.split === 'WEEK' ? 'by week' : per}`, V5: `${Subj ? Subj + ' · ' : ''}${q.intent === 'BY_TYPE' ? 'Debit vs credit' : 'By card'} · ${per}`,
-      V6: `${Subj ? Subj + ' · ' : ''}${q.by && q.by.type ? 'Debit vs credit' : 'By card'} · ${per}`, V7: q.intent === 'TOP' ? `${Subj ? Subj + ' · merchants' : 'Top merchants'} · ${per}` : `Top categories · ${per}`,
+      V6: `${Subj ? Subj + ' · ' : ''}${q.by && q.by.type ? 'Debit vs credit' : q.by && !q.by.card && q.by.category ? 'By category' : 'By card'} · ${per}`,
+      V4: `${q.subjects.slice(0, 3).map(x => x.name).join(' vs ')} · ${per}`, V15: `By category · ${mon(addM(som(TODAY), -1))} → ${mon(TODAY)}`,
+      V16: `Declined payments · ${q.period === 'last 30 days' ? '30 days' : per}`, V17: `${dcard ? D.tag(dcard) : 'Daily limit'} · Today`,
+      V19: `${Subj || 'All spend'} · ${q.period === 'last month' ? mon(addM(som(TODAY), -1)) : mon(TODAY)}`, V20: `By category · ${per}`, V7: q.intent === 'TOP' ? `${Subj ? Subj + ' · merchants' : 'Top merchants'} · ${per}` : `Top categories · ${per}`,
       V8: `Spend by category · ${per}`, V11: `What changed · ${per}`, V12: `${Subj || 'All spend'} · by weekday`, V21: 'Unusual activity', V14: 'Subscriptions & bills',
     };
     if (TITLE[P.visual]) P.title = TITLE[P.visual];
-    if (!/Last 8 weeks|Last 14 days|Seen 3\+|vs /.test(P.footer)) P.footer = `${Subj && P.visual !== 'V2' ? Subj + ' · ' : ''}${md(r.a)}–${r.a.getMonth() === r.b.getMonth() ? r.b.getDate() : md(r.b)}${r.partial ? ' · so far' : ''} · ${scopeLbl}`;
+    if (!P.keepFooter && !/Last 8 weeks|Last 14 days|Seen 3\+|vs /.test(P.footer)) P.footer = `${Subj && P.visual !== 'V2' && P.visual !== 'V4' ? Subj + ' · ' : ''}${md(r.a)}–${r.a.getMonth() === r.b.getMonth() ? r.b.getDate() : md(r.b)}${r.partial ? ' · so far' : ''} · ${scopeLbl}`;
     P.answer = P.takeaway;
     return P;
   }

@@ -6,8 +6,8 @@
  *   Charts.logo(name, size)       a merchant's monogram logo              */
 (function () {
   const D = window.NovaData;
-  const ACCENT = '#015b7e', CAT = ['#0b78ae', '#d9622b', '#7b61d1', '#2e9e6e'], GREY = '#d3d3d3', INK2 = '#646464', INK3 = '#919191', GRID = '#e6e6e6';
-  const color = s => (s === -1 ? GREY : s === 0 || s == null ? ACCENT : CAT[(s - 1) % 4]);
+  const ACCENT = '#015b7e', CAT = ['#0b78ae', '#d9622b', '#7b61d1', '#2e9e6e', '#b8892a', '#c2417a'], GREY = '#d3d3d3', INK2 = '#646464', INK3 = '#919191', GRID = '#e6e6e6';
+  const color = s => (s === -1 ? GREY : s === 0 || s == null ? ACCENT : CAT[(s - 1) % CAT.length]);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const W = 300;
   let uid = 0;
@@ -48,7 +48,7 @@
     'MetroPass Transit': 'tram', 'Harvest Market': 'cart', 'Corner Grocer': 'basket', 'Parcelhub': 'box', 'Northwind Store': 'bag',
     'Threadline Apparel': 'shirt', 'Skyline Air': 'plane', 'Starlight Cinemas': 'film', 'Arcade Nine': 'game', 'CareWell Pharmacy': 'plus',
     'Homestead Supply': 'home', 'Glow Studio': 'sparkle', 'Pawsome Pets': 'paw', 'Petal & Stem': 'flower', 'Streamly': 'play', 'Tuneloop': 'music',
-    'CloudVault': 'cloud', 'Pulse Gym': 'dumbbell', 'Voltline Energy': 'bolt', 'Linkwave Internet': 'wifi', 'Tellio Mobile': 'phone', 'Brightpath Courses': 'book',
+    'CloudVault': 'cloud', 'Pulse Gym': 'dumbbell', 'Voltline Energy': 'bolt', 'Linkwave Internet': 'wifi', 'Tellio Mobile': 'phone', 'Brightpath Courses': 'book', 'Lumen Books': 'book',
   };
   const logo = (name, size = 28) => {
     const l = D.logos[name] || { bg: '#eef2f4', fg: ACCENT }, g = G[MARK[name]];
@@ -99,7 +99,7 @@
       pts.forEach((x, i) => {
         const cx = i * cw + (cw - bw) / 2, h = x.amount > 0 ? Math.max(2, H - y(x.amount)) : 0, last = i === n - 1;
         s += `<path class="grow" style="animation-delay:${i * 22}ms" d="${col(cx, H - h, bw, h)}" fill="${x.partial ? `url(#${id})` : ACCENT}"/>`;
-        if (last && x.amount > 0) s += `<text x="${cx + bw / 2}" y="${H - h - 6}" font-size="12" font-weight="600" fill="#222" text-anchor="middle">${esc(x.display)}</text>`;
+        if (last && x.amount > 0) s += `<text x="${cx + bw / 2}" y="${H - h - 6}" font-size="12" font-weight="500" fill="#222" text-anchor="middle">${esc(x.display)}</text>`;
         if (i % every === (n - 1) % every) s += `<text x="${cx + bw / 2}" y="${H + 15}" font-size="11" fill="${INK2}" text-anchor="middle">${esc(x.label)}</text>`;
       });
       return s + '</svg>';
@@ -108,7 +108,7 @@
     V5(p) {
       const pts = p.series[0].points;
       return `<div class="ic-split">${pts.map((x, i) => `<i class="grow-x" style="flex:${Math.max(x.share, .02)};background:${color(x.colorSlot)};animation-delay:${i * 60}ms"></i>`).join('')}</div>
-        ${legend(pts.map(x => ({ label: x.label, value: x.display, colorSlot: x.colorSlot })), 'row')}`;
+        ${legend(pts.map(x => ({ label: x.label, value: x.display, colorSlot: x.colorSlot })), 'lrow')}`;
     },
     // Stacked columns over time, one colour per card (or per debit/credit), legend on the right.
     V6(p) {
@@ -129,12 +129,61 @@
       return `<div class="ic-v6"><svg viewBox="0 0 ${W - legendW} ${H + 20}"><defs>${defs}</defs><line x1="0" x2="${W - legendW}" y1="${H}" y2="${H}" stroke="${GRID}"/>${s}</svg>
         ${legend([...S].reverse().map(x => ({ label: x.label, colorSlot: x.colorSlot })), 'col')}</div>`;
     },
+    // Grouped columns: one cluster per month, one colour per subject; the period in progress hatched.
+    V4(p) {
+      const S = p.series, n = S[0] ? S[0].points.length : 0, k = S.length, H = 120, top = 8, gap = 2;
+      const max = Math.max(...S.flatMap(s => s.points.map(x => x.amount)), 1) * 1.06, cw = W / Math.max(n, 1);
+      const bw = Math.min(16, (cw * 0.74 - gap * (k - 1)) / k), gw = bw * k + gap * (k - 1), every = n > 7 ? 2 : 1;
+      let defs = '', s = '';
+      S.forEach(ser => { defs += hatch('h' + ++uid, color(ser.colorSlot)); ser.hid = 'h' + uid; });
+      for (let i = 0; i < n; i++) {
+        const gx = i * cw + (cw - gw) / 2;
+        S.forEach((ser, j) => {
+          const x = ser.points[i], h = x.amount > 0 ? Math.max(2, (H - top) * x.amount / max) : 0;
+          s += `<path class="grow" style="animation-delay:${i * 40 + j * 20}ms" d="${col(gx + j * (bw + gap), H - h, bw, h, 3)}" fill="${x.partial ? `url(#${ser.hid})` : color(ser.colorSlot)}"/>`;
+        });
+        if (i % every === (n - 1) % every) s += `<text x="${gx + gw / 2}" y="${H + 15}" font-size="11" fill="${INK2}" text-anchor="middle">${esc(S[0].points[i].label)}</text>`;
+      }
+      return `<svg viewBox="0 0 ${W} ${H + 20}"><defs>${defs}</defs><line x1="0" x2="${W}" y1="${H}" y2="${H}" stroke="${GRID}"/>${s}</svg>
+        ${legend(S.map(x => ({ label: x.label, value: x.value, colorSlot: x.colorSlot })))}`;
+    },
+    // Dumbbell: last month (grey) → this month (accent) per category, on one shared scale.
+    V15(p) {
+      const pts = p.series[0].points, max = Math.max(...pts.flatMap(x => [x.from, x.to]), 1), pos = v => +(v / max * 100).toFixed(1);
+      return `<div class="ic-dumb">${pts.map((x, i) => { const a = pos(Math.min(x.from, x.to)), b = pos(Math.max(x.from, x.to));
+        return `<div class="ic-drow"><em>${esc(x.label)}</em><span class="ic-dtrack"><span class="ln grow-x" style="left:${a}%;width:${b - a}%;background:${x.to >= x.from ? ACCENT : GREY};animation-delay:${i * 40}ms"></span>
+          <i style="left:${pos(x.from)}%;background:${GREY}"></i><i class="to" style="left:${pos(x.to)}%;background:${ACCENT};animation-delay:${i * 40 + 120}ms"></i></span><b>${esc(x.display)}</b></div>`; }).join('')}</div>
+        ${legend(p.legend)}`;
+    },
+    // Declined attempts: never charged, so the amount is struck through; the reason sits under the merchant.
+    V16(p) {
+      const pts = p.series[0].points;
+      if (!pts.length) return `<div class="ic-calm"><span>${Icon('check', 14)}</span>${esc(p.takeaway)}</div>`;
+      return pts.map(x => `<div class="ic-tx">${logo(x.label, 26)}<div><b>${esc(x.label)}</b><small>${esc(x.when)}</small><span class="ic-why">${esc(x.reason)}</span></div><strong class="ic-void">${esc(x.display)}</strong></div>`).join('');
+    },
+    // What's left of today's limit: the V9 meter without a pace tick.
+    V17(p) {
+      const m = p.meter, f = Math.min(1, m.spent / m.limit);
+      return `<b class="ic-hero">${esc(p.hero.display)}</b><div class="ic-meter"><i class="grow-x" style="width:${f * 100}%"></i></div>
+        <div class="ic-meter-l"><span>${esc(m.spentDisplay)}</span><span>${esc(m.limitDisplay)}</span></div>`;
+    },
+    // Month calendar: Monday-first grid, each day shaded by what went out; days still to come left blank.
+    V19(p) {
+      const pts = p.series[0].points, max = Math.max(...pts.map(x => x.amount || 0), 1);
+      const top = pts.reduce((m, x) => ((x.amount || 0) > (m.amount || 0) ? x : m), pts[0]);
+      return `<b class="ic-hero">${esc(p.hero.display)}</b><div class="ic-cal">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(d => `<span class="h">${d}</span>`).join('')}${'<span></span>'.repeat(p.offset)}${pts.map((x, i) => {
+        const o = x.amount ? 0.12 + 0.88 * Math.sqrt(x.amount / max) : 0;
+        return `<i class="${x.amount == null ? 'fut' : ''}${o > 0.55 ? ' hi' : ''}${x.today ? ' now' : ''}${x === top && x.amount ? ' peak' : ''}" style="--o:${o.toFixed(2)};animation-delay:${i * 10}ms" title="${esc(x.label)}${x.display ? ' · ' + esc(x.display) : ''}">${esc(x.label)}</i>`; }).join('')}</div>
+        <div class="ic-cal-l"><span>Less</span><i style="--o:.12"></i><i style="--o:.4"></i><i style="--o:.7"></i><i style="--o:1"></i><span>More</span></div>`;
+    },
+    // Category rows that open onto their merchants — the same rows and tap as the ranked view.
+    V20(p) { return R.V7(p); },
     // Donut with the total inside; legend with shares.
     V8(p) {
       const pts = p.series[0].points, tot = pts.reduce((n, x) => n + x.amount, 0) || 1, r = 44, C = 2 * Math.PI * r;
       let off = 0, arcs = '';
       pts.forEach((x, i) => { const len = x.amount / tot * C; arcs += `<circle r="${r}" cx="60" cy="60" fill="none" stroke="${color(x.colorSlot)}" stroke-width="20" stroke-dasharray="${Math.max(0, len - 2)} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 60 60)" class="arc" style="animation-delay:${i * 60}ms"/>`; off += len; });
-      return `<div class="ic-donut"><svg viewBox="0 0 120 120" width="112" height="112">${arcs}<text x="60" y="65" font-size="14" font-weight="600" fill="#222" text-anchor="middle">${esc(p.hero.display)}</text></svg>
+      return `<div class="ic-donut"><svg viewBox="0 0 120 120" width="112" height="112">${arcs}<text x="60" y="65" font-size="14" font-weight="500" fill="#222" text-anchor="middle">${esc(p.hero.display)}</text></svg>
         <div class="ic-legend col">${pts.map(x => `<span class="${x.label === p.focus ? 'focus' : ''}"><i style="background:${color(x.colorSlot)}"></i>${esc(x.label)}<b>${esc(x.pct || x.display)}</b></span>`).join('')}</div></div>`;
     },
     V9(p) {
@@ -151,7 +200,7 @@
         <path d="${path(last)}" fill="none" stroke="${GREY}" stroke-width="2"/><path class="draw" d="${path(cur)}" fill="none" stroke="${ACCENT}" stroke-width="2" stroke-linejoin="round"/>
         <circle cx="${x(li)}" cy="${y(cur.points[li].amount)}" r="4" fill="${ACCENT}"/>
         <text x="${W - 32}" y="${y(last.points[last.points.length - 1].amount) + 4}" font-size="11" fill="${INK3}">${esc(last.label)}</text>
-        <text x="${x(li) + 8}" y="${y(cur.points[li].amount) - 6}" font-size="11" font-weight="600" fill="${ACCENT}">${esc(cur.label)}</text>
+        <text x="${x(li) + 8}" y="${y(cur.points[li].amount) - 6}" font-size="11" font-weight="500" fill="${ACCENT}">${esc(cur.label)}</text>
         <text x="2" y="${H + 15}" font-size="11" fill="${INK2}">1</text><text x="${x(14)}" y="${H + 15}" font-size="11" fill="${INK2}" text-anchor="middle">15</text><text x="${x(p.days - 1)}" y="${H + 15}" font-size="11" fill="${INK2}" text-anchor="end">${p.days}</text></svg>`;
     },
     V11(p) {
@@ -160,31 +209,33 @@
         <span class="ic-track"><i class="grow-x" style="width:calc((100% - 70px) * ${Math.max(0.02, Math.abs(x.amount) / max)});background:${x.amount >= 0 ? ACCENT : GREY};animation-delay:${i * 30}ms"></i><b>${esc(x.display)}</b></span></div>`).join('')}</div>`;
     },
     V12(p) {
-      const pts = p.series[0].points, max = Math.max(...pts.map(x => x.amount), 1);
-      return `<div class="ic-wk">${pts.map((x, i) => `<div><em>${x.amount === max ? esc(x.display) : ''}</em><i style="opacity:${(0.14 + 0.86 * x.amount / max).toFixed(2)};animation-delay:${i * 30}ms"></i><span>${x.label}</span></div>`).join('')}</div>`;
+      const pts = p.series[0].points, max = Math.max(...pts.map(x => x.amount), 1), min = Math.min(...pts.map(x => x.amount));
+      return `<div class="ic-wk">${pts.map((x, i) => `<div><em>${x.amount === max ? esc(x.display) : ''}</em><i style="opacity:${(0.18 + 0.82 * (max > min ? (x.amount - min) / (max - min) : 1)).toFixed(2)};animation-delay:${i * 30}ms"></i><span>${x.label}</span></div>`).join('')}</div>`;
     },
     V13(p) {
       const pts = p.series[0].points, max = Math.max(...pts.map(x => x.amount), 1);
       return `<div class="ic-visits">${logo(p.title, 44)}<div><b class="ic-hero">${esc(p.hero.display)}</b><div class="ic-dots">${pts.map((x, i) => `<i style="--d:${6 + 12 * x.amount / max}px;opacity:${x.amount ? 1 : .2};animation-delay:${i * 30}ms"></i>`).join('')}</div></div></div>`;
     },
     V14(p) {
-      return `<b class="ic-hero">${esc(p.hero.display)}</b>` + p.series[0].points.map(x => `<div class="ic-tx">${logo(x.label, 30)}<div><b>${esc(x.label)}</b><small>next ${esc(x.next)}</small></div><strong>${esc(x.display)}</strong></div>`).join('');
+      return `<b class="ic-hero">${esc(p.hero.display)}</b>` + p.series[0].points.map(x => `<div class="ic-tx">${logo(x.label, 26)}<div><b>${esc(x.label)}</b><small>next ${esc(x.next)}</small></div><strong>${esc(x.display)}</strong></div>`).join('');
     },
     V18(p) {
       const b = p.band, pos = v => Math.min(100, v / p.max * 100);
       return `<div class="ic-v18"><b class="ic-hero">${esc(p.hero.display)}</b><span class="ic-chip">${esc(p.verdict.glyph)} ${esc(p.verdict.label)}</span></div>
         <div class="ic-gauge"><span class="band" style="left:${pos(b.low)}%;width:${pos(b.high) - pos(b.low)}%"></span><span class="med" style="left:${pos(b.median)}%"></span><span class="mk" style="left:${pos(p.marker)}%"></span></div>
-        <div class="ic-gauge-l"><span style="left:${pos(b.low)}%">${esc(b.lowDisplay)}</span><span style="left:${pos(b.high)}%">${esc(b.highDisplay)}</span></div>`;
+        <div class="ic-gauge-l">${pos(b.high) - pos(b.low) < 22 ? `<span style="left:${(pos(b.low) + pos(b.high)) / 2}%">${esc(b.lowDisplay)}–${esc(b.highDisplay)}</span>` : `<span style="left:${pos(b.low)}%">${esc(b.lowDisplay)}</span><span style="left:${pos(b.high)}%">${esc(b.highDisplay)}</span>`}</div>`;
     },
     V21(p) {
       const pts = p.series[0].points;
-      if (!pts.length) return `<div class="ic-calm"><span>✓</span>${esc(p.takeaway)}</div>`;
-      return pts.map(x => `<div class="ic-tx">${logo(x.label, 30)}<div><b>${esc(x.label)}</b><small>${esc(x.when)} · <span class="ic-pill">! ${esc(x.reason)}</span></small></div><strong>${esc(x.display)}</strong></div>`).join('');
+      if (!pts.length) return `<div class="ic-calm"><span>${Icon('check', 14)}</span>${esc(p.takeaway)}</div>`;
+      const warn = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"><path d="M6 1.2 11 10.5H1z"/><path d="M6 4.6v2.6"/><circle cx="6" cy="8.9" r=".35" fill="currentColor"/></svg>';
+      return `<div class="ic-unus">${pts.map(x => `<div class="ic-urow">${logo(x.label, 26)}<div class="ic-u1"><span>${esc(x.label)}</span><b>${esc(x.display)}</b></div>
+        <div class="ic-u2"><span class="ic-upill">${warn}${esc(x.reason)}</span><small>${esc(x.when)}</small></div></div>`).join('')}</div>`;
     },
   };
 
   function page(p) {
-    const calm = p.visual === 'V21' && !p.series[0].points.length;
+    const calm = (p.visual === 'V21' || p.visual === 'V16') && !p.series[0].points.length;
     return `<div class="ic-page"><div class="ic-title">${esc(p.title)}</div><div class="ic-body">${R[p.visual] ? R[p.visual](p) : ''}</div>
       ${calm ? '' : `<p class="ic-take">${esc(p.takeaway)}</p>`}<p class="ic-foot">${esc(p.footer)}</p></div>`;
   }
@@ -197,6 +248,17 @@
     }));
     return card;
   }
+  // Snap-scrolling tracks ignore smooth scrollTo in some browsers, so glide by hand.
+  function glide(track, to) {
+    if (document.hidden) { track.scrollLeft = to; return; }
+    const from = track.scrollLeft, t0 = performance.now(), T = 420;
+    track.style.scrollSnapType = 'none';
+    (function step(now) {
+      const k = Math.min(1, (now - t0) / T), e = 1 - Math.pow(1 - k, 3);
+      track.scrollLeft = from + (to - from) * e;
+      if (k < 1) requestAnimationFrame(step); else track.style.scrollSnapType = '';
+    })(t0);
+  }
   function renderDeck(panels, compact) {
     const card = document.createElement('div');
     card.className = 'ins' + (compact ? ' compact' : '');
@@ -204,7 +266,18 @@
     card.innerHTML = `<div class="ic-track-x">${panels.map(page).join('')}</div><div class="ic-pager">${panels.map((_, i) => `<button aria-label="Page ${i + 1}" class="${i ? '' : 'on'}"></button>`).join('')}</div>`;
     const track = card.querySelector('.ic-track-x'), dots = [...card.querySelectorAll('.ic-pager button')];
     track.addEventListener('scroll', () => { const i = Math.round(track.scrollLeft / track.clientWidth); dots.forEach((d, k) => d.classList.toggle('on', k === i)); }, { passive: true });
-    dots.forEach((d, i) => d.addEventListener('click', () => track.scrollTo({ left: i * track.clientWidth, behavior: 'smooth' })));
+    dots.forEach((d, i) => d.addEventListener('click', () => glide(track, i * track.clientWidth)));
+    // Carousel: move on every 2 s, once round and back to the first page; any touch stops it.
+    let seen = 0, tries = 0, stop = false;
+    ['pointerdown', 'wheel', 'touchstart'].forEach(e => card.addEventListener(e, () => (stop = true), { passive: true }));
+    const tick = () => {
+      if (stop || !card.isConnected) return;
+      const next = (Math.round(track.scrollLeft / track.clientWidth) + 1) % panels.length;
+      glide(track, next * track.clientWidth);
+      if (++seen < panels.length) setTimeout(tick, 2000);
+    };
+    const start = () => { if (card.isConnected && track.clientWidth) setTimeout(tick, 2000); else if (++tries < 80) setTimeout(start, 250); };
+    start();
     return wire(card);
   }
   const render = (p, compact) => renderDeck([p], compact);

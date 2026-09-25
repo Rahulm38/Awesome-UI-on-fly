@@ -1,18 +1,19 @@
 /* Demo data. Entirely fictional, generated relative to today on every load,
  * held in memory only. Reload the page to reset. */
 (function () {
-  let seed = 7;
+  // ?seed=N reshuffles the demo data (default 7). "Shuffle data" in the footer picks one.
+  let seed = (() => { try { const n = parseInt(new URLSearchParams(location.search).get('seed'), 10); return Number.isFinite(n) ? n >>> 0 : 7; } catch (e) { return 7; } })();
   const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
 
   const cards = [
-    { id: 'c1', name: 'Everyday', type: 'Debit', last4: '4821', state: 'ACTIVE', frozen: false },
+    { id: 'c1', name: 'Everyday', type: 'Debit', last4: '4821', state: 'ACTIVE', frozen: false, daily: 150 },
     { id: 'c2', name: 'Travel', type: 'Credit', last4: '1937', state: 'ACTIVE', frozen: true },
     { id: 'c5', name: 'Rewards', type: 'Credit', last4: '3344', state: 'ACTIVE', frozen: false },
     { id: 'c6', name: 'Family', type: 'Debit', last4: '1122', state: 'ACTIVE', frozen: false },
     { id: 'c7', name: 'Premier', type: 'Credit', last4: '8649', state: 'ACTIVE', frozen: false },
     { id: 'c3', name: 'Virtual', type: 'Prepaid', last4: '7710', state: 'PENDING_ACTIVATION', frozen: false },
     { id: 'c4', name: 'Old card', type: 'Debit', last4: '0042', state: 'CLOSED', archived: true, frozen: false },
-  ].map(c => Object.assign({ limit: null, blocked: [], allow: [], intlRestricted: false, atm: true, disputes: [] }, c));
+  ].map(c => Object.assign({ limit: null, daily: null, blocked: [], allow: [], intlRestricted: false, atm: true, disputes: [] }, c));
 
   // Which card people reach for, per category (weights over card ids).
   const HABIT = {
@@ -83,18 +84,40 @@
   // One charge well outside the usual, for "anything unusual?"
   const odd = new Date(now); odd.setDate(now.getDate() - 1);
   push(odd, 'Parcelhub', 'Shopping', 389.99, 'c7');
+  // A first visit to a shop never seen before.
+  LOGOS['Lumen Books'] = { bg: '#1e3a8a', fg: '#fde68a', t: 'L', city: 'San Francisco' };
+  const first = new Date(now); first.setDate(now.getDate() - 3);
+  push(first, 'Lumen Books', 'Shopping', 46.8, 'c5');
   txns.sort((a, b) => b.date - a.date);
   txns.filter(t => day0(t.date) >= day0(now)).forEach(t => (t.pending = true));
+
+  // Declined attempts: never charged, so never counted in spend. [days ago, hour, merchant, category, amount, card, reason]
+  const declines = [
+    [2, 19, 'Threadline Apparel', 'Shopping', 142.50, 'c1', 'Insufficient funds'],
+    [6, 13, 'Skyline Air', 'Travel', 412.00, 'c2', 'Card frozen'],
+    [11, 21, 'Arcade Nine', 'Entertainment', 38.00, 'c5', 'Merchant blocked'],
+    [19, 9, 'Fuelstop', 'Transport', 54.20, 'c6', 'Wrong PIN'],
+  ].map(([ago, h, merchant, category, amount, cardId, reason], i) => {
+    const date = new Date(now); date.setDate(now.getDate() - ago); date.setHours(h, 7 + i * 11);
+    return { id: 'd' + i, date, merchant, category, amount, cardId, reason };
+  });
 
   const initial = JSON.stringify(cards);
   window.NovaData = {
     // Put every card back the way it started — stories begin from the same state.
     reset() { JSON.parse(initial).forEach((c, i) => Object.assign(cards[i], c)); },
-    cards, txns, logos: LOGOS, subs: subs.map(s => s[0]),
-    merchants: [...merchants.map(m => m[0]), ...subs.map(s => s[0])],
+    cards, txns, declines, logos: LOGOS, subs: subs.map(s => s[0]),
+    merchants: [...merchants.map(m => m[0]), 'Lumen Books', ...subs.map(s => s[0])],
     categories: [...new Set([...merchants.map(m => m[1]), ...subs.map(s => s[1])])],
     countries: ['Japan', 'France', 'Mexico', 'Canada', 'Italy', 'Spain', 'Germany', 'India', 'Brazil', 'Thailand', 'Portugal'],
     card: id => cards.find(c => c.id === id),
     tag: c => `${c.name} ••${c.last4}`,
   };
+
+  // Shuffle data: reload with a fresh seed, other params kept.
+  const shuffle = document.getElementById('shuffle');
+  if (shuffle) shuffle.addEventListener('click', () => {
+    const q = new URLSearchParams(location.search); q.set('seed', String(1 + Math.floor(Math.random() * 99999)));
+    location.search = q.toString();
+  });
 })();
